@@ -244,7 +244,7 @@ export class EmailService {
                   date: parsed.date || new Date(),
                   text: parsed.text || '',
                   html: parsed.html || '',
-                  headers: parsed.headers as any,
+                  headers: (parsed as any).headers,
                   attachments: attachments && attachments.length > 0 ? attachments : undefined,
                 };
 

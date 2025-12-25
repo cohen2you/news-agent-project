@@ -560,7 +560,7 @@ app.post("/approve", async (req, res) => {
     if (selectedArticleIndex !== undefined && selectedArticleIndex !== null && 
         newsArticles[selectedArticleIndex]) {
       selectedArticle = newsArticles[selectedArticleIndex];
-      console.log(`   Using article: "${selectedArticle.title || 'Untitled'}"`);
+      console.log(`   Using article: "${selectedArticle?.title || 'Untitled'}"`);
     }
     
     // Resume the graph with the human decision, selected app, selected article, and manual ticker
@@ -1994,7 +1994,7 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
           if (apiKey) {
             try {
               const { fetchBenzingaArticleByUrl } = await import("./benzinga-api");
-              sourceData = await fetchBenzingaArticleByUrl(cardDescriptionUrl, apiKey);
+              sourceData = await fetchBenzingaArticleByUrl(cardDescriptionUrl!, apiKey);
               
               if (sourceData) {
                 console.log(`   ✅ Fetched article from API: ${sourceData.title}`);
@@ -2108,7 +2108,7 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
                 if (apiKey) {
                   try {
                     const { fetchBenzingaArticleByUrl } = await import("./benzinga-api");
-                    const correctArticle = await fetchBenzingaArticleByUrl(cardDescriptionUrl, apiKey);
+                    const correctArticle = await fetchBenzingaArticleByUrl(cardDescriptionUrl!, apiKey);
                     
                     if (correctArticle) {
                       console.log(`   ✅ Successfully re-fetched correct article: ${correctArticle.title}`);
@@ -2164,7 +2164,7 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
                 if (apiKey) {
                   try {
                     const { fetchBenzingaArticleByUrl } = await import("./benzinga-api");
-                    const fetchedArticle = await fetchBenzingaArticleByUrl(cardDescriptionUrl, apiKey);
+                    const fetchedArticle = await fetchBenzingaArticleByUrl(cardDescriptionUrl!, apiKey);
                     
                     if (fetchedArticle) {
                       sourceData = fetchedArticle;
@@ -2227,7 +2227,7 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
               return url.toLowerCase().replace(/\/+$/, '').trim();
             };
             
-            const normalizedCardUrl = normalizeUrl(cardDescriptionUrl);
+            const normalizedCardUrl = normalizeUrl(cardDescriptionUrl!);
             const normalizedStoredUrl = storedUrl ? normalizeUrl(storedUrl) : null;
             
             if (normalizedStoredUrl && normalizedCardUrl !== normalizedStoredUrl) {
@@ -2244,7 +2244,7 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
               if (apiKey) {
                 try {
                   const { fetchBenzingaArticleByUrl } = await import("./benzinga-api");
-                  const correctArticle = await fetchBenzingaArticleByUrl(cardDescriptionUrl, apiKey);
+                  const correctArticle = await fetchBenzingaArticleByUrl(cardDescriptionUrl!, apiKey);
                   
                   if (correctArticle) {
                     console.log(`   ✅ Successfully re-fetched correct article: ${correctArticle.title}`);
@@ -2340,7 +2340,7 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
           };
           // Automatically created card - validate URL matches stored data
           const storedUrl = sourceData.url || sourceData.link || '';
-          const normalizedCardUrl = normalizeUrlFinal(cardDescriptionUrl);
+          const normalizedCardUrl = normalizeUrlFinal(cardDescriptionUrl!);
           const normalizedStoredUrl = storedUrl ? normalizeUrlFinal(storedUrl) : '';
           
           if (normalizedStoredUrl && normalizedCardUrl !== normalizedStoredUrl) {
@@ -3624,7 +3624,13 @@ async function monitorWGOControlCardComments() {
     }
 
     // Find the newest user comment we haven't processed yet
-    let newComment = null;
+    interface TrelloComment {
+      id: string;
+      data: { text: string; };
+      date: string;
+      idMemberCreator: string;
+    }
+    let newComment: TrelloComment | null = null;
     if (lastProcessedCommentId) {
       // Find the index of the last processed comment in the full comments list
       const lastProcessedIndex = comments.findIndex(c => c.id === lastProcessedCommentId);
