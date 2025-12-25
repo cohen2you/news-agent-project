@@ -2,10 +2,13 @@
   "name": "news-agent-project",
   "version": "1.0.0",
   "description": "AI Agent for generating articles with human-in-the-loop approval",
-  "main": "server.ts",
+  "main": "dist/server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "build": "tsc",
-    "postbuild": "node -e \"require('fs').copyFileSync('index.html', 'dist/index.html')\"",
+    "postbuild": "node -e \"const fs = require('fs'); if (fs.existsSync('index.html')) fs.copyFileSync('index.html', 'dist/index.html');\"",
     "start": "node dist/server.js",
     "dev": "powershell -ExecutionPolicy Bypass -File kill-port.ps1 && timeout /t 2 /nobreak >nul && tsx watch server.ts",
     "dev:clean": "powershell -ExecutionPolicy Bypass -File kill-port.ps1 && timeout /t 2 /nobreak >nul && tsx watch server.ts",
