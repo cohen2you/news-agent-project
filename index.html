@@ -1,0 +1,2124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Editorial Desk</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            padding-top: 50px;
+            margin: 0;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background: var(--card);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 { margin-top: 0; font-size: 1.5rem; color: #334155; }
+        
+        /* Utility Classes for Hiding/Showing Sections */
+        .hidden { display: none; }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Input Styles */
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box; /* Fixes padding width issue */
+        }
+
+        /* Button Styles */
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+        
+        .btn-primary { background-color: var(--primary); color: white; width: 100%; }
+        .btn-success { background-color: var(--success); color: white; }
+        .btn-danger { background-color: var(--danger); color: white; }
+        .btn-outline { background-color: transparent; border: 1px solid #cbd5e1; color: #64748b; }
+
+        /* Review Section */
+        .pitch-card {
+            background: #f1f5f9;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary);
+            margin: 1.5rem 0;
+            white-space: pre-wrap; /* Preserves newlines in pitch */
+            font-family: monospace;
+            font-size: 0.95rem;
+        }
+
+        /* Article display styling for HTML content */
+        #article-display {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+            white-space: normal !important;
+            font-size: 1rem !important;
+            line-height: 1.6;
+        }
+
+        #article-display p {
+            margin: 1em 0;
+        }
+
+        #article-display a {
+            color: var(--primary);
+            text-decoration: underline;
+        }
+
+        #article-display strong {
+            font-weight: 600;
+        }
+
+        /* Articles List */
+        .articles-list {
+            margin: 1.5rem 0;
+        }
+
+        .article-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            transition: box-shadow 0.2s;
+        }
+
+        .article-card:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .article-card h4 {
+            margin: 0 0 0.5rem 0;
+            color: #1e293b;
+            font-size: 1rem;
+        }
+
+        .article-card .article-meta {
+            font-size: 0.85rem;
+            color: #64748b;
+            margin-bottom: 0.75rem;
+        }
+
+        .article-card .article-summary {
+            font-size: 0.9rem;
+            color: #475569;
+            line-height: 1.5;
+            margin-bottom: 0.75rem;
+        }
+
+        .article-card .article-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-pitch {
+            background-color: var(--primary);
+            color: white;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+        }
+
+        .btn-view {
+            background-color: transparent;
+            border: 1px solid #cbd5e1;
+            color: #64748b;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 1rem;
+        }
+        
+        .actions button { flex: 1; }
+
+        /* Loader */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: #64748b;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h1>Editorial Desk 🗞️</h1>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <button onclick="showPRMonitor()" class="btn-outline" style="width: auto; padding: 6px 12px; font-size: 0.9rem;">📡 PR Monitor</button>
+            <span id="status-badge" style="font-size: 0.8rem; background:#e2e8f0; padding:4px 8px; border-radius:4px;">Ready</span>
+        </div>
+    </div>
+
+    <div id="section-start">
+        <label for="topic">What should the Analyst look for?</label>
+        <input type="text" id="topic" placeholder="e.g. AI Agents in Finance, Renewable Energy...">
+        <div style="margin: 10px 0;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                <input type="checkbox" id="pr-only" style="width: auto; margin: 0;">
+                <span style="font-size: 0.9rem; color: #64748b;">Search Press Releases only</span>
+            </label>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <button onclick="startAgent()" class="btn-primary" style="flex: 1;">Find & Pitch Story</button>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <button id="btn-auto-scan" class="btn-success" style="flex: 1;">🔍 Auto-Scan Articles</button>
+            <button id="btn-pr-auto-scan" class="btn-success" style="flex: 1; background: #059669;">📰 Start PR Auto-Scan</button>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <button id="btn-email-analyst" class="btn-success" style="flex: 1; background: #ea580c;">📧 Check Analyst Emails</button>
+        </div>
+    </div>
+
+    <div id="section-loading" class="hidden status-bar">
+        <div class="loader"></div>
+        <span id="loading-text">Analyst is researching...</span>
+    </div>
+
+    <div id="section-review" class="hidden fade-in">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 id="review-section-title" style="margin: 0;">Articles Found</h3>
+            <button onclick="if (typeof unselectPR === 'function' && selectedPRIndex !== null) { unselectPR(); } else { showSection('section-start'); }" class="btn-outline" style="padding: 6px 12px; font-size: 0.85rem;">
+                ← Back to PR List
+            </button>
+        </div>
+        <p id="review-section-description" style="color:#64748b; font-size:0.9rem;">Select an article to generate a pitch, or review the default pitch below.</p>
+        
+        <div class="articles-list" id="articles-list">
+            <!-- Articles will be populated here -->
+        </div>
+
+        <div style="margin: 1.5rem 0; padding-top: 1.5rem; border-top: 1px solid #e2e8f0;">
+            <h4 id="pitch-section-title" style="margin-top: 0; color:#64748b; font-size:0.95rem;">Default Pitch (Top Article):</h4>
+            <div class="pitch-card" id="pitch-display" style="font-size: 0.9rem;">
+            </div>
+        </div>
+
+        <div style="margin: 1rem 0;">
+            <label for="app-selector" style="display:block; margin-bottom:0.5rem; font-size:0.9rem; color:#64748b;">
+                Select Article Generator:
+            </label>
+            <select id="app-selector" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.95rem;" onchange="checkTickerRequirement()">
+                <option value="">Loading...</option>
+            </select>
+        </div>
+
+        <div id="ticker-display-container" style="margin: 1rem 0; display: none;">
+            <div style="background-color: #eff6ff; border: 1px solid #3b82f6; border-radius: 6px; padding: 12px;">
+                <p style="margin: 0 0 8px 0; color: #1e40af; font-size: 0.9rem; font-weight: 500;">
+                    📊 Detected Ticker for WGO Article Generator
+                </p>
+                <p style="margin: 0; color: #1e3a8a; font-size: 0.85rem;">
+                    Ticker: <strong id="detected-ticker-display">-</strong>
+                </p>
+                <p style="margin: 8px 0 0 0; color: #1e3a8a; font-size: 0.85rem;">
+                    If this ticker is incorrect, you can override it below.
+                </p>
+            </div>
+        </div>
+
+        <div id="ticker-input-container" style="margin: 1rem 0; display: none;">
+            <div style="background-color: #fef3c7; border: 1px solid #fbbf24; border-radius: 6px; padding: 12px; margin-bottom: 0.5rem;">
+                <p style="margin: 0 0 8px 0; color: #92400e; font-size: 0.9rem; font-weight: 500;">
+                    ⚠️ No ticker detected for WGO Article Generator
+                </p>
+                <p style="margin: 0; color: #78350f; font-size: 0.85rem;">
+                    The WGO Article Generator requires a stock ticker to generate technical analysis. Please enter a ticker below.
+                </p>
+            </div>
+            <label for="manual-ticker-input" style="display:block; margin-bottom:0.5rem; font-size:0.9rem; color:#64748b;">
+                Enter Stock Ticker (e.g., AAPL, TSLA, MSFT):
+            </label>
+            <input 
+                type="text" 
+                id="manual-ticker-input" 
+                placeholder="Enter ticker (1-5 letters)"
+                style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.95rem; text-transform: uppercase;"
+                maxlength="5"
+                pattern="[A-Z]{1,5}"
+                oninput="this.value = this.value.toUpperCase().replace(/[^A-Z]/g, '')"
+            />
+        </div>
+
+        <div id="ticker-override-container" style="margin: 1rem 0; display: none;">
+            <label for="ticker-override-input" style="display:block; margin-bottom:0.5rem; font-size:0.9rem; color:#64748b;">
+                Override Ticker (if detected ticker is incorrect):
+            </label>
+            <input 
+                type="text" 
+                id="ticker-override-input" 
+                placeholder="Enter correct ticker (1-5 letters)"
+                style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.95rem; text-transform: uppercase;"
+                maxlength="5"
+                pattern="[A-Z]{1,5}"
+                oninput="this.value = this.value.toUpperCase().replace(/[^A-Z]/g, '')"
+            />
+        </div>
+
+        <div class="actions">
+            <button onclick="if (typeof unselectPR === 'function' && selectedPRIndex !== null) { unselectPR(); } else { submitDecision('no'); }" class="btn-danger">Cancel</button>
+            <button onclick="submitDecision('yes')" class="btn-success" id="approve-btn">Approve & Generate</button>
+        </div>
+    </div>
+
+    <div id="section-result" class="hidden fade-in">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0;">Article Generated ✅</h3>
+            <button onclick="copyArticle()" class="btn-primary" id="copy-btn" style="width: auto; padding: 8px 16px;">
+                📋 Copy Article
+            </button>
+        </div>
+        <div class="pitch-card" id="article-display" style="border-left-color: var(--success); background: #f0fdf4; max-height: 70vh; overflow-y: auto;">
+            </div>
+        <div style="display: flex; gap: 10px; margin-top: 1rem;">
+            <button onclick="resetUI()" class="btn-outline" style="flex: 1;">Start New Pitch</button>
+            <button onclick="showSection('section-start')" class="btn-outline" style="flex: 1;">Back to Main</button>
+        </div>
+    </div>
+
+    <div id="section-pr-monitor" class="hidden fade-in">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0;">PR Monitor 📡</h3>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="startPRMonitor()" class="btn-success" id="pr-monitor-start-btn" style="width: auto; padding: 8px 16px;">Start</button>
+                <button onclick="stopPRMonitor()" class="btn-danger" id="pr-monitor-stop-btn" style="width: auto; padding: 8px 16px;">Stop</button>
+            </div>
+        </div>
+        <div id="pr-monitor-status" style="margin-bottom: 1rem; padding: 1rem; background: #f1f5f9; border-radius: 8px;">
+            <p style="margin: 0; color: #64748b;">Status: Not running</p>
+        </div>
+        <div id="pr-monitor-list" style="max-height: 60vh; overflow-y: auto;">
+            <!-- PR list will be populated here -->
+        </div>
+        <button onclick="showMainView()" class="btn-outline" style="width:100%; margin-top: 1rem;">Back to Main</button>
+    </div>
+
+    <!-- Auto-Scan Section -->
+    <div id="section-auto-scan" class="section hidden fade-in">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h2 style="margin: 0;">Auto-Scan & Article Generation</h2>
+            <button onclick="window.showSection('section-start')" class="btn-outline" style="width: auto; padding: 8px 16px;">Back to Main</button>
+        </div>
+        
+        <div style="background: #f8fafc; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
+            <h3 style="margin-top: 0; margin-bottom: 1rem;">Configuration</h3>
+            
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Tickers to Monitor (comma-separated)</label>
+                <input 
+                    type="text" 
+                    id="auto-scan-tickers" 
+                    placeholder="e.g., NVDA, MSFT, AAPL, TSLA"
+                    style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 1rem;"
+                />
+                <p style="margin-top: 0.5rem; font-size: 0.85rem; color: #64748b;">
+                    Enter stock tickers separated by commas. The system will scan for articles from the past 48 hours.
+                </p>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 1rem;">
+                <button onclick="window.startAutoScan()" class="btn-success" style="flex: 1;" id="auto-scan-start-btn">🚀 Start Auto-Scan</button>
+                <button onclick="window.stopAutoScan()" class="btn-outline" style="flex: 1;" id="auto-scan-stop-btn" disabled>⏸️ Stop Auto-Scan</button>
+            </div>
+            
+            <div id="auto-scan-status" style="margin-top: 1rem; padding: 1rem; background: white; border-radius: 6px; border: 1px solid #e2e8f0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <strong>Status:</strong>
+                    <span id="auto-scan-status-text" style="color: #64748b;">Not running</span>
+                </div>
+                <div style="font-size: 0.9rem; color: #64748b;">
+                    <div>Monitored Tickers: <span id="auto-scan-tickers-display">-</span></div>
+                    <div>Processed Articles: <span id="auto-scan-processed-count">0</span></div>
+                    <div>Generated Articles: <span id="auto-scan-generated-count">0</span></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Fetched Articles Queue (shows articles being processed) -->
+        <div style="margin-bottom: 2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0;">Article Processing Queue</h3>
+                <button onclick="window.refreshFetchedArticles()" class="btn-outline" style="padding: 6px 12px; font-size: 0.9rem;">🔄 Refresh</button>
+        </div>
+            
+            <div id="auto-scan-queue-list" style="max-height: 40vh; overflow-y: auto; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0;">
+                <p style="text-align: center; color: #64748b; padding: 2rem;">No articles in queue. Start auto-scan to fetch articles.</p>
+            </div>
+        </div>
+        
+        <!-- Generated Articles (final results) -->
+        <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0;">✅ Generated Articles (Ready to Copy)</h3>
+                <button onclick="window.refreshGeneratedArticles()" class="btn-outline" style="padding: 6px 12px; font-size: 0.9rem;">🔄 Refresh</button>
+            </div>
+            
+            <div id="auto-scan-articles-list" style="max-height: 60vh; overflow-y: auto;">
+                <p style="text-align: center; color: #64748b; padding: 2rem;">No articles generated yet. Articles will appear here once processing is complete.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- PR Auto-Scan Section -->
+    <div id="section-pr-auto-scan" class="section hidden fade-in">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h2 style="margin: 0;">PR Auto-Scan & News Story Generation</h2>
+            <button onclick="window.showSection('section-start')" class="btn-outline" style="width: auto; padding: 8px 16px;">Back to Main</button>
+        </div>
+        
+        <div style="background: #f8fafc; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
+            <h3 style="margin-top: 0; margin-bottom: 1rem;">Configuration</h3>
+            
+            <div style="margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 6px; border: 1px solid #e2e8f0;">
+                <p style="margin: 0; font-size: 0.9rem; color: #64748b;">
+                    The system will scan for press releases from 100 pre-configured tickers across 3 API queries. 
+                    It will check for new PRs from the past 48 hours and generate news stories using the News Story Generator.
+                </p>
+            </div>
+            
+            <div style="margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 6px; border: 1px solid #e2e8f0;">
+                <label style="display: flex; align-items: center; gap: 0.75rem; font-weight: 500; margin-bottom: 0.5rem;">
+                    <span>Generation Mode:</span>
+                </label>
+                <div style="display: flex; gap: 1rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="radio" name="pr-scan-mode" value="auto" checked id="pr-scan-mode-auto" onchange="updatePRScanMode()">
+                        <span>Auto</span>
+                        <span style="font-size: 0.85rem; color: #64748b;">(Automatically generate articles)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="radio" name="pr-scan-mode" value="manual" id="pr-scan-mode-manual" onchange="updatePRScanMode()">
+                        <span>Manual</span>
+                        <span style="font-size: 0.85rem; color: #64748b;">(Generate articles on demand)</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 1rem;">
+                <button onclick="window.startPRAutoScan()" class="btn-success" style="flex: 1; background: #059669;" id="pr-auto-scan-start-btn">🚀 Start PR Auto-Scan</button>
+                <button onclick="window.stopPRAutoScan()" class="btn-outline" style="flex: 1;" id="pr-auto-scan-stop-btn" disabled>⏸️ Stop PR Auto-Scan</button>
+            </div>
+            
+            <div id="pr-auto-scan-status" style="margin-top: 1rem; padding: 1rem; background: white; border-radius: 6px; border: 1px solid #e2e8f0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <strong>Status:</strong>
+                    <span id="pr-auto-scan-status-text" style="color: #64748b;">Not running</span>
+                </div>
+                <div style="font-size: 0.9rem; color: #64748b;">
+                    <div>Monitored Tickers: <span id="pr-auto-scan-tickers-display">-</span></div>
+                    <div>Processed PRs: <span id="pr-auto-scan-processed-count">0</span></div>
+                    <div>Generated Articles: <span id="pr-auto-scan-generated-count">0</span></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Fetched PRs Queue (shows PRs being processed) -->
+        <div style="margin-bottom: 2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div>
+                    <h3 style="margin: 0;">PR Processing Queue</h3>
+                    <p style="margin: 0.25rem 0 0 0; font-size: 0.75rem; color: #64748b;">Auto-refreshing every 30 seconds (PR scanning every 5 minutes)</p>
+                </div>
+                <button onclick="window.refreshPRFetchedArticles()" class="btn-outline" style="padding: 6px 12px; font-size: 0.9rem;">🔄 Manual Refresh</button>
+            </div>
+            
+            <div id="pr-auto-scan-queue-list" style="max-height: 40vh; overflow-y: auto; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0;">
+                <p style="text-align: center; color: #64748b; padding: 2rem;">No PRs in queue. Start PR auto-scan to fetch press releases.</p>
+            </div>
+        </div>
+        
+        <!-- Generated Articles (final results) -->
+        <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div>
+                    <h3 style="margin: 0;">✅ Generated News Stories (Ready to Copy)</h3>
+                    <p style="margin: 0.25rem 0 0 0; font-size: 0.75rem; color: #64748b;">Auto-refreshing every 30 seconds (PR scanning every 5 minutes)</p>
+                </div>
+                <button onclick="window.refreshPRGeneratedArticles()" class="btn-outline" style="padding: 6px 12px; font-size: 0.9rem;">🔄 Manual Refresh</button>
+            </div>
+            
+            <div id="pr-auto-scan-articles-list" style="max-height: 60vh; overflow-y: auto;">
+                <p style="text-align: center; color: #64748b; padding: 2rem;">No articles generated yet. Articles will appear here once processing is complete.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Email Analyst Section -->
+    <div id="section-email-analyst" class="section hidden fade-in">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h2 style="margin: 0;">📧 Email Analyst Agent</h2>
+            <button onclick="showSection('section-start')" class="btn-outline">← Back to Main</button>
+        </div>
+        
+        <div style="background: #f8fafc; padding: 1.5rem; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 1.5rem;">
+            <p style="margin: 0 0 1rem 0; color: #64748b;">
+                The Email Analyst Agent monitors your inbox for analyst notes with PDF attachments and creates Trello cards automatically.
+            </p>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="window.checkAnalystEmails()" class="btn-success" style="flex: 1; background: #ea580c;" id="email-analyst-check-btn">📧 Check Emails Now</button>
+            </div>
+        </div>
+        
+        <div id="email-analyst-status" style="margin-top: 1rem; padding: 1rem; background: white; border-radius: 6px; border: 1px solid #e2e8f0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <strong>Status:</strong>
+                <span id="email-analyst-status-text" style="color: #64748b;">Ready to check</span>
+            </div>
+            <div style="margin-top: 0.5rem; font-size: 0.9rem; color: #64748b;">
+                <div>Emails Processed: <span id="email-analyst-processed-count">0</span></div>
+                <div>Cards Created: <span id="email-analyst-cards-count">0</span></div>
+            </div>
+        </div>
+        
+        <div id="email-analyst-results" style="margin-top: 1rem; padding: 1rem; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; display: none;">
+            <h3 style="margin-top: 0;">Last Check Results</h3>
+            <div id="email-analyst-results-content"></div>
+        </div>
+    </div>
+
+    <!-- Generated Article View Section -->
+    <div id="section-generated-article" class="section hidden fade-in">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2 style="margin: 0;" id="generated-article-title">Generated Article</h2>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="copyGeneratedArticle()" class="btn-primary" id="copy-generated-btn">📋 Copy Article</button>
+                <button onclick="showSection('section-auto-scan')" class="btn-outline">← Back to Auto-Scan</button>
+            </div>
+        </div>
+        
+        <div id="generated-article-display" style="background: white; padding: 2rem; border-radius: 8px; border: 1px solid #e2e8f0; max-height: 70vh; overflow-y: auto;">
+            <!-- Article content will be displayed here -->
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // Define showSection FIRST, before anything else
+    window.showSection = function(id) {
+        console.log('[showSection] Called with id:', id);
+        const sections = ['section-start', 'section-loading', 'section-review', 'section-result', 'section-pr-monitor', 'section-auto-scan', 'section-pr-auto-scan', 'section-email-analyst', 'section-generated-article'];
+        
+        // Hide all sections
+        sections.forEach(s => {
+            const element = document.getElementById(s);
+            if (element) {
+                element.classList.add('hidden');
+            }
+        });
+        
+        // Show target section
+        const targetElement = document.getElementById(id);
+        if (targetElement) {
+            targetElement.classList.remove('hidden');
+            console.log(`[showSection] ✅ Section shown: ${id}`);
+            
+            // Auto-start polling for PR auto-scan section if it's shown
+            if (id === 'section-pr-auto-scan') {
+                setTimeout(() => {
+                    console.log('[showSection] PR auto-scan section shown, loading data and starting polling...');
+                    // Load data immediately
+                    if (typeof fetchPRAutoScanStatus === 'function') {
+                        fetchPRAutoScanStatus();
+                    }
+                    if (typeof window.refreshPRFetchedArticles === 'function') {
+                        window.refreshPRFetchedArticles();
+                    }
+                    if (typeof window.refreshPRGeneratedArticles === 'function') {
+                        window.refreshPRGeneratedArticles();
+                    }
+                    // Always check and start polling (will start if active, or wait if not)
+                    if (typeof checkAndStartPRPolling === 'function') {
+                        checkAndStartPRPolling();
+                    } else if (typeof startPRStatusPolling === 'function') {
+                        // Fallback: if checkAndStartPRPolling doesn't exist, just start polling
+                        // (it will stop if section becomes hidden)
+                        startPRStatusPolling();
+                    }
+                }, 100);
+            }
+        } else {
+            console.error(`[showSection] ❌ Section element not found: ${id}`);
+        }
+    };
+    console.log('[Script Init] window.showSection defined:', typeof window.showSection);
+    
+    // Test immediately
+    if (typeof window.showSection !== 'function') {
+        console.error('[Script Init] ERROR: window.showSection is not a function!');
+    } else {
+        console.log('[Script Init] ✅ window.showSection is ready');
+    }
+    
+    // Configuration
+    const API_URL = "http://localhost:3001";
+    let currentThreadId = null;
+    let availableApps = [];
+    let currentArticles = [];
+    let selectedArticleIndex = null;
+    let prMonitorInterval = null;
+    
+    // Create a local reference for use within the script
+    const showSection = window.showSection;
+
+    async function startAgent() {
+        const topic = document.getElementById('topic').value;
+        if (!topic) return alert("Please enter a topic");
+
+        // UI Updates
+        showSection('section-loading');
+        document.getElementById('loading-text').innerText = "Analyst is researching...";
+        document.getElementById('section-start').classList.add('hidden');
+        
+
+        const prOnly = document.getElementById('pr-only').checked;
+        
+        try {
+            // Call API
+            const response = await fetch(`${API_URL}/start`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ topic, prOnly })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.status === "paused_for_review") {
+                currentThreadId = data.threadId;
+                currentArticles = data.articles || [];
+                selectedArticleIndex = null; // Reset selection
+                
+                // Display default pitch
+                document.getElementById('pitch-display').innerText = data.pitch;
+                
+                // Reset pitch section title to default
+                const pitchSectionTitle = document.getElementById('pitch-section-title');
+                if (pitchSectionTitle) {
+                    pitchSectionTitle.textContent = 'Default Pitch (Top Article):';
+                }
+                
+                // Populate articles list
+                displayArticles(currentArticles);
+                
+                // Populate app selector
+                if (data.availableApps && data.availableApps.length > 0) {
+                    availableApps = data.availableApps;
+                    const selector = document.getElementById('app-selector');
+                    selector.innerHTML = ''; // Clear any default options
+                    data.availableApps.forEach(app => {
+                        const option = document.createElement('option');
+                        option.value = app.name;
+                        option.textContent = app.label;
+                        selector.appendChild(option);
+                    });
+                    // Check if ticker is required after loading apps
+                    checkTickerRequirement();
+                } else {
+                    // If no apps, show a message
+                    const selector = document.getElementById('app-selector');
+                    selector.innerHTML = '<option value="">No apps configured</option>';
+                }
+                
+                showSection('section-review');
+                updateBadge("Waiting for Approval");
+            }
+        } catch (err) {
+            alert("Error connecting to Agent: " + err);
+            resetUI();
+        }
+    }
+    
+    // WGO Agent function removed - now use Trello "WGO Search Control" card comments instead
+    // Comment on the control card with a ticker (e.g., "AMD") to trigger a WGO search
+
+    function displayArticles(articles) {
+        const container = document.getElementById('articles-list');
+        container.innerHTML = '';
+        
+        if (!articles || articles.length === 0) {
+            container.innerHTML = '<p style="color:#64748b; text-align:center; padding:2rem;">No articles found.</p>';
+            return;
+        }
+        
+        articles.forEach((article, index) => {
+            const card = document.createElement('div');
+            card.className = 'article-card';
+            card.id = `article-${index}`;
+            
+            const isSelected = selectedArticleIndex === index;
+            if (isSelected) {
+                card.style.borderColor = 'var(--primary)';
+                card.style.borderWidth = '2px';
+                card.style.backgroundColor = '#eff6ff';
+            }
+            
+            card.innerHTML = `
+                <h4>${escapeHtml(article.title)}</h4>
+                <div class="article-meta">Published: ${article.date}</div>
+                <div class="article-summary">${escapeHtml(article.summary)}</div>
+                <div class="article-actions">
+                    <button onclick="selectArticle(${index})" class="btn-pitch">
+                        ${isSelected ? '✓ Selected' : 'Select & Pitch'}
+                    </button>
+                    ${article.url ? `<a href="${article.url}" target="_blank" class="btn-view">View Source</a>` : ''}
+                </div>
+            `;
+            
+            container.appendChild(card);
+        });
+    }
+
+    async function selectArticle(index) {
+        selectedArticleIndex = index;
+        displayArticles(currentArticles); // Re-render to show selection
+        
+        // Update approve button text
+        const approveBtn = document.getElementById('approve-btn');
+        if (approveBtn && currentArticles[index]) {
+            approveBtn.textContent = `Approve & Generate: "${currentArticles[index].title.substring(0, 40)}${currentArticles[index].title.length > 40 ? '...' : ''}"`;
+        }
+
+        // Regenerate pitch for the selected article
+        try {
+            const response = await fetch(`${API_URL}/regenerate-pitch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    threadId: currentThreadId,
+                    articleIndex: index
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.status === "success") {
+                // Update the pitch display with the new pitch
+                document.getElementById('pitch-display').innerText = data.pitch;
+                
+                // Update the section title to show which article is selected
+                const pitchSectionTitle = document.getElementById('pitch-section-title');
+                if (pitchSectionTitle && data.selectedArticle) {
+                    const title = data.selectedArticle.title || 'Selected Article';
+                    const truncatedTitle = title.length > 50 ? title.substring(0, 50) + '...' : title;
+                    pitchSectionTitle.textContent = `Selected Pitch: "${truncatedTitle}"`;
+                }
+            }
+        } catch (err) {
+            console.error("Error regenerating pitch:", err);
+            // Don't show alert - just log the error, selection still works
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function checkTickerRequirement() {
+        const selectedApp = document.getElementById('app-selector').value;
+        const tickerContainer = document.getElementById('ticker-input-container');
+        const tickerInput = document.getElementById('manual-ticker-input');
+        
+        // Check if WGO is selected
+        const isWGO = selectedApp && selectedApp.toLowerCase().includes('wgo');
+        
+        if (isWGO) {
+            // Check if we have a ticker from the PR/article
+            const hasTicker = currentArticles.length > 0 && 
+                             currentArticles[0].ticker && 
+                             /^[A-Z]{1,5}$/.test(currentArticles[0].ticker.toUpperCase());
+            
+            // Show ticker input if no ticker found
+            if (!hasTicker) {
+                tickerContainer.style.display = 'block';
+                tickerInput.required = true;
+            } else {
+                tickerContainer.style.display = 'none';
+                tickerInput.required = false;
+                tickerInput.value = '';
+            }
+        } else {
+            tickerContainer.style.display = 'none';
+            tickerInput.required = false;
+            tickerInput.value = '';
+        }
+    }
+
+    async function submitDecision(decision) {
+        // Clear article display first to prevent any text from appearing
+        const articleDisplay = document.getElementById('article-display');
+        articleDisplay.innerHTML = '';
+        articleDisplay.innerText = '';
+        
+        // Get selected app
+        const selectedApp = document.getElementById('app-selector').value;
+        
+        // Check if WGO is selected and ticker is required
+        const isWGO = selectedApp && selectedApp.toLowerCase().includes('wgo');
+        const tickerInput = document.getElementById('manual-ticker-input');
+        const tickerOverrideInput = document.getElementById('ticker-override-input');
+        let manualTicker = null;
+        
+        if (isWGO) {
+            // Check if we have a ticker from the PR/article
+            const detectedTicker = currentArticles.length > 0 && currentArticles[0].ticker 
+                ? currentArticles[0].ticker.toUpperCase().trim() 
+                : null;
+            const hasTicker = detectedTicker && /^[A-Z]{1,5}$/.test(detectedTicker);
+            
+            // Check for override ticker first (user wants to override detected ticker)
+            const overrideTicker = tickerOverrideInput.value.trim().toUpperCase();
+            if (overrideTicker && /^[A-Z]{1,5}$/.test(overrideTicker)) {
+                manualTicker = overrideTicker;
+                console.log(`✅ Using override ticker: ${manualTicker} (detected was: ${detectedTicker || 'none'})`);
+            }
+            // If no override, check if we have a detected ticker
+            else if (hasTicker) {
+                manualTicker = detectedTicker;
+                console.log(`✅ Using detected ticker: ${manualTicker}`);
+            }
+            // If no ticker from PR, check manual input
+            else {
+                manualTicker = tickerInput.value.trim().toUpperCase();
+                if (!manualTicker || !/^[A-Z]{1,5}$/.test(manualTicker)) {
+                    alert('⚠️ Please enter a valid stock ticker (1-5 letters) to generate a WGO article with technical analysis.');
+                    tickerInput.focus();
+                    return;
+                }
+                console.log(`✅ Using manual ticker input: ${manualTicker}`);
+            }
+        }
+        
+        // UI Updates
+        showSection('section-loading');
+        document.getElementById('loading-text').innerText = decision === 'yes' ? "Writer is generating article..." : "Canceling...";
+        
+        // Check if this is a PR-based generation (no threadId from normal flow)
+        if ((!currentThreadId || currentThreadId.startsWith('pr_')) && currentArticles.length > 0) {
+            // Generate article directly from PR (bypass agent workflow)
+            try {
+                const pr = currentArticles[0];
+                
+                // Call the direct PR generation endpoint
+                const response = await fetch(`${API_URL}/generate-from-pr`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        pr: pr,
+                        selectedApp: selectedApp,
+                        manualTicker: manualTicker
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.status === "completed") {
+                    articleDisplay.innerHTML = '';
+                    articleDisplay.innerText = '';
+                    
+                    const articleText = data.finalArticle || '';
+                    const containsHTML = /<[a-z][\s\S]*>/i.test(articleText);
+                    
+                    if (containsHTML) {
+                        articleDisplay.innerHTML = articleText;
+                        articleDisplay.dataset.plainText = articleText.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim();
+                    } else {
+                        articleDisplay.innerText = articleText;
+                        articleDisplay.dataset.plainText = articleText;
+                    }
+                    
+                    showSection('section-result');
+                    updateBadge("Completed");
+                }
+                return;
+            } catch (err) {
+                console.error('Error generating from PR:', err);
+                alert("Error: " + err.message);
+                showSection('section-review');
+                return;
+            }
+        }
+        
+        try {
+            const response = await fetch(`${API_URL}/approve`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    threadId: currentThreadId, 
+                    decision: decision,
+                    selectedApp: selectedApp,
+                    selectedArticleIndex: selectedArticleIndex, // Pass the selected article index
+                    manualTicker: manualTicker // Pass manual ticker if provided
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (data.status === "completed") {
+                // Ensure article display is completely clear before setting new content
+                articleDisplay.innerHTML = '';
+                articleDisplay.innerText = '';
+                
+                // Check if the article contains HTML tags
+                const articleText = data.finalArticle || '';
+                const containsHTML = /<[a-z][\s\S]*>/i.test(articleText);
+                
+                if (containsHTML) {
+                    // Render HTML content
+                    articleDisplay.innerHTML = articleText;
+                    // Store plain text version for copying (strip HTML tags)
+                    articleDisplay.dataset.plainText = articleText.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim();
+                } else {
+                    // Display as plain text
+                    articleDisplay.innerText = articleText;
+                    articleDisplay.dataset.plainText = articleText;
+                }
+                
+                // Switch to result section (this hides the loading section)
+                showSection('section-result');
+                updateBadge("Completed");
+            }
+        } catch (err) {
+            alert("Error: " + err);
+            resetUI();
+        }
+    }
+
+    
+    // Function to generate article from a PR (when user clicks on it) - kept for backward compatibility
+    window.generateArticleFromPR = function(ticker, title) {
+        // Only generate if we have a valid ticker
+        if (ticker && ticker !== 'UNKNOWN') {
+            document.getElementById('topic').value = ticker;
+            document.getElementById('pr-only').checked = true;
+            startAgent();
+        } else {
+            alert('Cannot generate article: No ticker available for this PR. Please use "Select & Pitch" button instead.');
+        }
+    };
+
+    // PR Monitor functions
+    async function startPRMonitor() {
+        const btn = document.getElementById('pr-monitor-start-btn');
+        btn.disabled = true;
+        btn.textContent = 'Starting...';
+        
+        try {
+            const response = await fetch(`${API_URL}/pr-monitor/start`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    tickers: null, // Use default 20 monitored stocks
+                    intervalMinutes: 5 // 5 minute updates
+                })
+            });
+            
+            const data = await response.json();
+            if (data.status === "started") {
+                // Wait a moment for initial load to complete, then update
+                setTimeout(() => {
+                    updatePRMonitorStatus();
+                    // Poll for updates every 5 seconds to refresh the display
+                    if (prMonitorInterval) clearInterval(prMonitorInterval);
+                    prMonitorInterval = setInterval(updatePRMonitorStatus, 5000);
+                }, 3000); // Wait 3 seconds for initial load
+            }
+        } catch (err) {
+            alert("Error starting PR monitor: " + err);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Start';
+        }
+    }
+
+    async function stopPRMonitor() {
+        try {
+            await fetch(`${API_URL}/pr-monitor/stop`, { method: 'POST' });
+            if (prMonitorInterval) {
+                clearInterval(prMonitorInterval);
+                prMonitorInterval = null;
+            }
+            updatePRMonitorStatus();
+        } catch (err) {
+            alert("Error stopping PR monitor: " + err);
+        }
+    }
+
+    async function updatePRMonitorStatus() {
+        try {
+            const response = await fetch(`${API_URL}/pr-monitor/status`);
+            const data = await response.json();
+            
+            const statusDiv = document.getElementById('pr-monitor-status');
+            statusDiv.innerHTML = `
+                <p style="margin: 0 0 0.5rem 0;"><strong>Status:</strong> ${data.running ? '🟢 Running' : '🔴 Stopped'}</p>
+                ${data.running ? `<p style="margin: 0; color: #64748b; font-size: 0.9rem;">Monitoring ${data.totalMonitored || 0} tickers | ${data.recentPRs?.length || 0} recent PRs</p>` : ''}
+            `;
+            
+            // Display recent PRs (top 10)
+            const listDiv = document.getElementById('pr-monitor-list');
+            if (data.recentPRs && data.recentPRs.length > 0) {
+                listDiv.innerHTML = `
+                    <h4 style="margin-bottom: 1rem; color: #64748b;">Most Recent PRs (${data.recentPRs.length})</h4>
+                    ${data.recentPRs.map((pr, idx) => {
+                    const date = pr.created ? new Date(pr.created * 1000) : null;
+                    const dateStr = date ? date.toLocaleDateString() : 'N/A';
+                    const timeStr = date ? date.toLocaleTimeString() : '';
+                    return `
+                        <div class="article-card" style="margin-bottom: 1rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                                <strong style="color: var(--primary); font-size: 1.1rem;">${pr.ticker || 'N/A'}</strong>
+                                <span style="font-size: 0.85rem; color: #64748b;">${dateStr} ${timeStr}</span>
+                            </div>
+                            <h4 style="margin: 0 0 0.5rem 0; font-size: 1rem;">${escapeHtml(pr.title || 'No title')}</h4>
+                            <div style="font-size: 0.9rem; color: #475569; line-height: 1.5;">${escapeHtml((pr.teaser || pr.body || '').substring(0, 250))}${(pr.teaser || pr.body || '').length > 250 ? '...' : ''}</div>
+                            ${pr.url ? `<a href="${pr.url}" target="_blank" style="display: inline-block; margin-top: 0.5rem; font-size: 0.85rem; color: var(--primary);">View Source →</a>` : ''}
+                        </div>
+                    `;
+                }).join('')}
+                `;
+            } else {
+                listDiv.innerHTML = '<p style="text-align: center; color: #64748b; padding: 2rem;">No PRs found yet. Loading...</p>';
+            }
+        } catch (err) {
+            console.error("Error updating PR monitor status:", err);
+            const listDiv = document.getElementById('pr-monitor-list');
+            listDiv.innerHTML = '<p style="text-align: center; color: #dc2626; padding: 2rem;">Error loading PRs. Please try again.</p>';
+        }
+    }
+
+    function showPRMonitor() {
+        showSection('section-pr-monitor');
+        // Load status immediately
+        updatePRMonitorStatus();
+        // Start polling every 5 seconds to update the display
+        if (prMonitorInterval) {
+            clearInterval(prMonitorInterval);
+        }
+        prMonitorInterval = setInterval(updatePRMonitorStatus, 5000);
+    }
+
+    function showMainView() {
+        showSection('section-start');
+        if (prMonitorInterval) {
+            clearInterval(prMonitorInterval);
+            prMonitorInterval = null;
+        }
+    }
+
+    // showSection is already defined at the top of the script
+    
+    // Dedicated handler for Auto-Scan button click
+    function handleAutoScanClick() {
+        // Immediate visual feedback
+        alert('Button clicked! Opening Auto-Scan section...');
+        
+        console.log('[handleAutoScanClick] 🖱️ Button clicked!');
+        console.log('[handleAutoScanClick] showSection function exists:', typeof showSection);
+        console.log('[handleAutoScanClick] window.showSection exists:', typeof window.showSection);
+        
+        try {
+            console.log('[handleAutoScanClick] Attempting to call showSection("section-auto-scan")...');
+            showSection('section-auto-scan');
+            console.log('[handleAutoScanClick] ✅ showSection call completed');
+        } catch (error) {
+            console.error('[handleAutoScanClick] ❌ Error calling showSection:', error);
+            console.error('[handleAutoScanClick] Error stack:', error.stack);
+            alert('Error: ' + error.message);
+        }
+    }
+    
+    // handleAutoScanClick is already defined above
+    window.handleAutoScanClick = handleAutoScanClick;
+    
+    // Log when script loads
+    console.log('[Script Loaded] Auto-scan functions initialized');
+    console.log('[Script Loaded] showSection type:', typeof showSection);
+    console.log('[Script Loaded] handleAutoScanClick type:', typeof handleAutoScanClick);
+    
+    // Set up button event listeners when DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('[DOMContentLoaded] Page loaded, setting up button listeners...');
+        console.log('[DOMContentLoaded] window.showSection type:', typeof window.showSection);
+        const autoScanBtn = document.getElementById('btn-auto-scan');
+        if (autoScanBtn) {
+            console.log('[DOMContentLoaded] ✅ Auto-Scan button found, adding click listener');
+            autoScanBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                console.log('[Button Click] Auto-Scan button clicked!');
+                console.log('[Button Click] window.showSection type:', typeof window.showSection);
+                if (typeof window.showSection === 'function') {
+                    console.log('[Button Click] Calling window.showSection...');
+                    window.showSection('section-auto-scan');
+                } else {
+                    console.error('[Button Click] showSection is not a function! Type:', typeof window.showSection);
+                    alert('showSection function not available. Type: ' + typeof window.showSection);
+                }
+            });
+        } else {
+            console.error('[DOMContentLoaded] ❌ Auto-Scan button NOT found!');
+        }
+    });
+
+    function copyArticle() {
+        const articleDisplay = document.getElementById('article-display');
+        const articleText = articleDisplay.dataset.plainText || articleDisplay.innerText || articleDisplay.textContent || '';
+        
+        if (!articleText.trim()) {
+            alert('No article content to copy');
+            return;
+        }
+        
+        // Copy to clipboard
+        navigator.clipboard.writeText(articleText).then(() => {
+            const copyBtn = document.getElementById('copy-btn');
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = '✓ Copied!';
+            copyBtn.style.backgroundColor = 'var(--success)';
+            
+            setTimeout(() => {
+                copyBtn.textContent = originalText;
+                copyBtn.style.backgroundColor = 'var(--primary)';
+            }, 2000);
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            alert('Failed to copy article. Please select and copy manually.');
+        });
+    }
+
+    function resetUI() {
+        document.getElementById('topic').value = '';
+        currentThreadId = null;
+        currentArticles = [];
+        selectedArticleIndex = null;
+        document.getElementById('approve-btn').textContent = 'Approve & Generate';
+        showSection('section-start');
+        updateBadge("Ready");
+    }
+    
+    function updateBadge(text) {
+        document.getElementById('status-badge').innerText = text;
+    }
+
+    // ============================================
+    // AUTO-SCAN FUNCTIONS - REBUILT CLEANLY
+    // ============================================
+    
+    let autoScanStatusInterval = null;
+    let generatedArticlesList = [];
+    
+    // Simple button click handler - just show the section
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('[DOMContentLoaded] Page loaded, setting up auto-scan button...');
+        const btn = document.getElementById('btn-auto-scan');
+        if (btn) {
+            console.log('[DOMContentLoaded] ✅ Auto-scan button found');
+            btn.addEventListener('click', function() {
+                console.log('[Button Click] Auto-scan button clicked!');
+                console.log('[Button Click] window.showSection type:', typeof window.showSection);
+                
+                if (typeof window.showSection === 'function') {
+                    console.log('[Button Click] Calling window.showSection("section-auto-scan")...');
+                    window.showSection('section-auto-scan');
+                    console.log('[Button Click] showSection called, checking if section is visible...');
+                    
+                    // Check if section is actually visible
+                    setTimeout(() => {
+                        const section = document.getElementById('section-auto-scan');
+                        if (section) {
+                            console.log('[Button Click] Section element found, classes:', section.className);
+                            console.log('[Button Click] Section has "hidden" class:', section.classList.contains('hidden'));
+                } else {
+                            console.error('[Button Click] ❌ Section element NOT found!');
+                        }
+                    }, 50);
+                    
+                    // Load status and articles when section is shown
+                    setTimeout(() => {
+                        console.log('[Button Click] Loading status and articles...');
+                        if (typeof fetchAutoScanStatus === 'function') {
+                            console.log('[Button Click] Calling fetchAutoScanStatus()...');
+                            fetchAutoScanStatus();
+                        } else {
+                            console.error('[Button Click] fetchAutoScanStatus is not a function!');
+                        }
+                        if (typeof window.refreshGeneratedArticles === 'function') {
+                            console.log('[Button Click] Calling refreshGeneratedArticles()...');
+                            window.refreshGeneratedArticles();
+                        } else {
+                            console.error('[Button Click] refreshGeneratedArticles is not a function!');
+                        }
+                    }, 100);
+                } else {
+                    console.error('[Button Click] ❌ window.showSection is not a function! Type:', typeof window.showSection);
+                    alert('Error: showSection function not available. Please refresh the page.');
+                }
+            });
+        } else {
+            console.error('[DOMContentLoaded] ❌ Auto-scan button NOT found!');
+        }
+    });
+    
+    // Start auto-scan
+    window.startAutoScan = async function() {
+        const tickersInput = document.getElementById('auto-scan-tickers');
+        const tickersStr = tickersInput ? tickersInput.value.trim() : '';
+        
+        if (!tickersStr) {
+            alert('Please enter at least one ticker to monitor');
+            return;
+        }
+        
+        const tickers = tickersStr.split(',').map(t => t.trim().toUpperCase()).filter(t => t.length > 0);
+        if (tickers.length === 0) {
+            alert('Please enter valid tickers');
+            return;
+        }
+        
+        try {
+            const startBtn = document.getElementById('auto-scan-start-btn');
+            const stopBtn = document.getElementById('auto-scan-stop-btn');
+            
+            if (startBtn) {
+                startBtn.disabled = true;
+                startBtn.textContent = '⏳ Starting...';
+            }
+            
+            const response = await fetch(`${API_URL}/auto-scan/start`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tickers, app: 'wgo' })
+            });
+            
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            
+            const data = await response.json();
+            console.log('Auto-scan started:', data);
+            
+            if (startBtn) {
+                startBtn.disabled = true;
+                startBtn.textContent = '🚀 Auto-Scan Running';
+            }
+            if (stopBtn) stopBtn.disabled = false;
+            
+            startStatusPolling();
+            await window.refreshFetchedArticles();
+            await window.refreshGeneratedArticles();
+            
+        } catch (error) {
+            console.error('Error starting auto-scan:', error);
+            alert('Error starting auto-scan: ' + error.message);
+            const startBtn = document.getElementById('auto-scan-start-btn');
+            if (startBtn) {
+                startBtn.disabled = false;
+                startBtn.textContent = '🚀 Start Auto-Scan';
+            }
+        }
+    };
+    
+    // Stop auto-scan
+    window.stopAutoScan = async function() {
+        try {
+            const response = await fetch(`${API_URL}/auto-scan/stop`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            
+            const data = await response.json();
+            console.log('Auto-scan stopped:', data);
+            
+            const startBtn = document.getElementById('auto-scan-start-btn');
+            const stopBtn = document.getElementById('auto-scan-stop-btn');
+            
+            if (startBtn) {
+                startBtn.disabled = false;
+                startBtn.textContent = '🚀 Start Auto-Scan';
+            }
+            if (stopBtn) stopBtn.disabled = true;
+            
+            if (autoScanStatusInterval) {
+                clearInterval(autoScanStatusInterval);
+                autoScanStatusInterval = null;
+            }
+            
+            updateAutoScanStatus({ active: false, tickers: [], processedCount: 0, generatedCount: 0 });
+            
+        } catch (error) {
+            console.error('Error stopping auto-scan:', error);
+            alert('Error stopping auto-scan: ' + error.message);
+        }
+    };
+    
+    function startStatusPolling() {
+        if (autoScanStatusInterval) clearInterval(autoScanStatusInterval);
+        fetchAutoScanStatus();
+        window.refreshFetchedArticles();
+        window.refreshGeneratedArticles();
+        autoScanStatusInterval = setInterval(() => {
+            fetchAutoScanStatus();
+            window.refreshFetchedArticles();
+            window.refreshGeneratedArticles();
+        }, 3000); // Poll every 3 seconds for real-time updates
+    }
+    
+    async function fetchAutoScanStatus() {
+        try {
+            const response = await fetch(`${API_URL}/auto-scan/status`);
+            if (!response.ok) return;
+            const status = await response.json();
+            updateAutoScanStatus(status);
+        } catch (error) {
+            console.error('Error fetching auto-scan status:', error);
+        }
+    }
+    
+    function updateAutoScanStatus(status) {
+        const statusText = document.getElementById('auto-scan-status-text');
+        const tickersDisplay = document.getElementById('auto-scan-tickers-display');
+        const processedCount = document.getElementById('auto-scan-processed-count');
+        const generatedCount = document.getElementById('auto-scan-generated-count');
+        
+        if (statusText) {
+            statusText.textContent = status.active ? '🟢 Running' : '⚪ Stopped';
+            statusText.style.color = status.active ? '#10b981' : '#64748b';
+        }
+        if (tickersDisplay) {
+            tickersDisplay.textContent = status.tickers && status.tickers.length > 0 ? status.tickers.join(', ') : '-';
+        }
+        if (processedCount) processedCount.textContent = status.processedCount || 0;
+        if (generatedCount) generatedCount.textContent = status.generatedCount || 0;
+    }
+    
+    // Refresh fetched articles queue (shows processing status)
+    window.refreshFetchedArticles = async function() {
+        try {
+            const response = await fetch(`${API_URL}/auto-scan/fetched-articles`);
+            if (!response.ok) return;
+            const data = await response.json();
+            displayFetchedArticles(data.articles || [], data.currentlyProcessingIndex);
+        } catch (error) {
+            console.error('[refreshFetchedArticles] Error:', error);
+        }
+    };
+    
+    function displayFetchedArticles(articles, currentlyProcessingIndex) {
+        const list = document.getElementById('auto-scan-queue-list');
+        if (!list) return;
+        
+        if (articles.length === 0) {
+            list.innerHTML = '<p style="text-align: center; color: #64748b; padding: 2rem;">No articles in queue. Start auto-scan to fetch articles.</p>';
+            return;
+        }
+        
+        let html = '';
+        articles.forEach((item, idx) => {
+            const isProcessing = idx === currentlyProcessingIndex;
+            const statusIcon = item.status === 'completed' ? '✅' : 
+                              item.status === 'generating' ? '🔄' : 
+                              item.status === 'failed' ? '❌' : '⏳';
+            const statusText = item.status === 'completed' ? 'Completed' : 
+                              item.status === 'generating' ? 'Generating WGO Story...' : 
+                              item.status === 'failed' ? 'Failed' : 'Queued';
+            const statusColor = item.status === 'completed' ? '#10b981' : 
+                              item.status === 'generating' ? '#2563eb' : 
+                              item.status === 'failed' ? '#dc2626' : '#64748b';
+            
+            const date = item.published ? new Date(item.published).toLocaleDateString() : 'N/A';
+            const ticker = typeof item.ticker === 'string' ? item.ticker : (item.ticker?.ticker || item.ticker?.symbol || 'N/A');
+            
+            html += `
+                <div style="padding: 1rem; margin-bottom: 0.5rem; background: white; border-radius: 6px; border: 2px solid ${isProcessing ? '#2563eb' : '#e2e8f0'}; ${isProcessing ? 'box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);' : ''}">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                <span style="font-size: 1.2rem;">${statusIcon}</span>
+                                <strong style="color: ${statusColor}; font-size: 0.9rem;">${statusText}</strong>
+                                ${isProcessing ? '<span style="background: #2563eb; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">PROCESSING NOW</span>' : ''}
+                            </div>
+                            <div style="font-weight: 500; margin-bottom: 0.25rem;">${escapeHtml(item.title)}</div>
+                            <div style="font-size: 0.85rem; color: #64748b;">
+                                <span style="color: var(--primary); font-weight: 500;">${escapeHtml(ticker)}</span> • ${date}
+                            </div>
+                            ${item.error ? `<div style="margin-top: 0.5rem; padding: 0.5rem; background: #fee2e2; border-radius: 4px; font-size: 0.85rem; color: #dc2626;">Error: ${escapeHtml(item.error)}</div>` : ''}
+                        </div>
+                        <div style="margin-left: 1rem; font-size: 0.85rem; color: #64748b; font-weight: 500;">
+                            #${idx + 1}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        list.innerHTML = html;
+    }
+    
+    window.refreshGeneratedArticles = async function() {
+        console.log('[refreshGeneratedArticles] Fetching articles from:', `${API_URL}/auto-scan/articles`);
+        try {
+            const response = await fetch(`${API_URL}/auto-scan/articles`);
+            console.log('[refreshGeneratedArticles] Response status:', response.status, response.statusText);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
+            console.log('[refreshGeneratedArticles] Data received:', data);
+            generatedArticlesList = data.articles || [];
+            console.log('[refreshGeneratedArticles] Articles count:', generatedArticlesList.length);
+            displayGeneratedArticles(generatedArticlesList);
+        } catch (error) {
+            console.error('[refreshGeneratedArticles] Error:', error);
+            const list = document.getElementById('auto-scan-articles-list');
+            if (list) {
+                list.innerHTML = `<p style="text-align: center; color: #dc2626; padding: 2rem;">Error loading articles: ${error.message}</p>`;
+            }
+        }
+    };
+    
+    function displayGeneratedArticles(articles) {
+        console.log('[displayGeneratedArticles] 🎨 Called with', articles.length, 'articles');
+        const list = document.getElementById('auto-scan-articles-list');
+        if (!list) {
+            console.error('[displayGeneratedArticles] ❌ List element not found!');
+            return;
+        }
+        console.log('[displayGeneratedArticles] ✅ List element found');
+        
+        if (articles.length === 0) {
+            console.log('[displayGeneratedArticles] No articles to display');
+            list.innerHTML = '<p style="text-align: center; color: #64748b; padding: 2rem;">No articles generated yet. Start auto-scan to begin generating articles.</p>';
+            return;
+        }
+        
+        console.log('[displayGeneratedArticles] 📝 Rendering', articles.length, 'articles');
+        let html = '';
+        articles.forEach((article, idx) => {
+            const date = new Date(article.createdAt);
+            const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+            console.log(`[displayGeneratedArticles] Article ${idx + 1}: ${article.ticker} - ${article.title?.substring(0, 50)}...`);
+            html += `
+                <div class="article-card" style="margin-bottom: 1rem; cursor: pointer; padding: 1rem; border: 1px solid #e2e8f0; border-radius: 8px; background: white;" onclick="window.viewGeneratedArticle('${article.id}')">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                        <div style="flex: 1;">
+                            <strong style="color: var(--primary); font-size: 1.1rem;">${escapeHtml(article.ticker || 'N/A')}</strong>
+                            <h4 style="margin: 0.5rem 0 0 0; font-size: 1rem;">${escapeHtml(article.title || 'Untitled')}</h4>
+                            <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: #64748b;">Source: ${escapeHtml(article.sourceTitle || 'Unknown')}</p>
+                        </div>
+                        <span style="font-size: 0.85rem; color: #64748b; margin-left: 1rem;">${dateStr}</span>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                        <button onclick="event.stopPropagation(); window.viewGeneratedArticle('${article.id}')" class="btn-primary" style="flex: 1; padding: 6px 12px; font-size: 0.85rem;">View Article</button>
+                        <button onclick="event.stopPropagation(); window.copyGeneratedArticleById('${article.id}')" class="btn-outline" style="padding: 6px 12px; font-size: 0.85rem;">📋 Copy</button>
+                    </div>
+                </div>
+            `;
+        });
+        list.innerHTML = html;
+        console.log('[displayGeneratedArticles] ✅ Articles rendered to DOM, HTML length:', html.length);
+    }
+    
+    window.viewGeneratedArticle = async function(id) {
+        try {
+            const response = await fetch(`${API_URL}/auto-scan/articles/${id}`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const article = await response.json();
+            window.currentGeneratedArticle = article;
+            
+            const titleEl = document.getElementById('generated-article-title');
+            if (titleEl) titleEl.textContent = `${article.ticker}: ${article.title}`;
+            
+            const display = document.getElementById('generated-article-display');
+            if (display) display.innerHTML = article.generatedArticle;
+            
+            window.showSection('section-generated-article');
+        } catch (error) {
+            console.error('Error viewing article:', error);
+            alert('Error loading article: ' + error.message);
+        }
+    };
+    
+    window.copyGeneratedArticle = function() {
+        const article = window.currentGeneratedArticle;
+        if (!article) {
+            alert('No article selected');
+            return;
+        }
+        navigator.clipboard.writeText(article.generatedArticle).then(() => {
+            const copyBtn = document.getElementById('copy-generated-btn');
+            if (copyBtn) {
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = '✓ Copied!';
+                copyBtn.style.backgroundColor = 'var(--success)';
+                setTimeout(() => {
+                    if (copyBtn) {
+                        copyBtn.textContent = originalText;
+                        copyBtn.style.backgroundColor = '';
+                    }
+                }, 2000);
+            }
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            alert('Failed to copy article. Please select and copy manually.');
+        });
+    };
+    
+    window.copyGeneratedArticleById = async function(id) {
+        try {
+            const response = await fetch(`${API_URL}/auto-scan/articles/${id}`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const article = await response.json();
+            await navigator.clipboard.writeText(article.generatedArticle);
+            alert('Article copied to clipboard!');
+        } catch (error) {
+            console.error('Error copying article:', error);
+            alert('Error copying article: ' + error.message);
+        }
+    };
+
+    // ============================================
+    // PR AUTO-SCAN FUNCTIONS
+    // ============================================
+    
+    let prAutoScanStatusInterval = null;
+    let prGeneratedArticlesList = [];
+    
+    // PR Auto-Scan button click handler
+    document.addEventListener('DOMContentLoaded', function() {
+        const btn = document.getElementById('btn-pr-auto-scan');
+        if (btn) {
+            btn.addEventListener('click', function() {
+                console.log('[PR Auto-Scan Button] Clicked!');
+                if (typeof window.showSection === 'function') {
+                    window.showSection('section-pr-auto-scan');
+                    setTimeout(() => {
+                        // Load data immediately
+                        if (typeof fetchPRAutoScanStatus === 'function') {
+                            fetchPRAutoScanStatus();
+                        }
+                        if (typeof window.refreshPRFetchedArticles === 'function') {
+                            window.refreshPRFetchedArticles();
+                        }
+                        if (typeof window.refreshPRGeneratedArticles === 'function') {
+                            window.refreshPRGeneratedArticles();
+                        }
+                        // Start polling if auto-scan is active
+                        checkAndStartPRPolling();
+                    }, 100);
+                } else {
+                    alert('Error: showSection function not available. Please refresh the page.');
+                }
+            });
+        }
+        
+        // Also attach event listener to Start PR Auto-Scan button as fallback
+        const startBtn = document.getElementById('pr-auto-scan-start-btn');
+        if (startBtn) {
+            console.log('[DOMContentLoaded] ✅ Found PR auto-scan start button, attaching listener');
+            // Remove existing onclick and use addEventListener instead
+            startBtn.removeAttribute('onclick');
+            startBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                console.log('[PR Auto-Scan Start Button] Clicked via event listener');
+                if (typeof window.startPRAutoScan === 'function') {
+                    window.startPRAutoScan();
+                } else {
+                    console.error('[PR Auto-Scan Start Button] window.startPRAutoScan is not a function!');
+                    alert('Error: startPRAutoScan function not available. Please refresh the page.');
+                }
+            });
+        } else {
+            console.error('[DOMContentLoaded] ❌ PR auto-scan start button NOT found!');
+        }
+    });
+    
+    // Check if PR auto-scan is active and start polling if section is visible
+    function checkAndStartPRPolling() {
+        // Check if PR auto-scan section is visible
+        const section = document.getElementById('section-pr-auto-scan');
+        if (!section || section.classList.contains('hidden')) {
+            return; // Section not visible, don't poll
+        }
+        
+        // Check if auto-scan is active by checking status
+        fetch(`${API_URL}/pr-auto-scan/status`)
+            .then(response => response.json())
+            .then(status => {
+                if (status.active && !prAutoScanStatusInterval) {
+                    console.log('[PR Auto-Scan] Auto-scan is active, starting polling...');
+                    startPRStatusPolling();
+                }
+            })
+            .catch(err => console.error('Error checking PR auto-scan status:', err));
+    }
+    
+    // Update PR scan mode
+    window.updatePRScanMode = function() {
+        const modeRadio = document.querySelector('input[name="pr-scan-mode"]:checked');
+        const mode = modeRadio ? modeRadio.value : 'auto';
+        console.log('[PR Auto-Scan] Mode changed to:', mode);
+        // Refresh the queue display to show/hide Generate buttons
+        if (typeof window.refreshPRFetchedArticles === 'function') {
+            window.refreshPRFetchedArticles();
+        }
+    };
+    
+    // Generate article for a specific PR manually
+    window.generatePRArticle = async function(articleId) {
+        const button = document.getElementById(`generate-btn-${articleId}`);
+        if (button) {
+            button.disabled = true;
+            button.textContent = '🔄 Generating...';
+        }
+        
+        try {
+            console.log(`[PR Auto-Scan] Generating article for PR: ${articleId}`);
+            const response = await fetch(`${API_URL}/pr-auto-scan/generate-article/${articleId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log(`[PR Auto-Scan] Article generated successfully:`, data);
+            
+            // Refresh the queue and generated articles
+            if (typeof window.refreshPRFetchedArticles === 'function') {
+                window.refreshPRFetchedArticles();
+            }
+            if (typeof window.refreshPRGeneratedArticles === 'function') {
+                window.refreshPRGeneratedArticles();
+            }
+            
+            // Show success message
+            if (button) {
+                button.textContent = '✅ Generated';
+                button.style.background = '#059669';
+            }
+        } catch (error) {
+            console.error('[PR Auto-Scan] Error generating article:', error);
+            alert(`Error generating article: ${error.message}`);
+            if (button) {
+                button.disabled = false;
+                button.textContent = '📝 Generate Article';
+            }
+        }
+    };
+    
+    // Start PR auto-scan
+    window.startPRAutoScan = async function() {
+        console.log('[PR Auto-Scan] startPRAutoScan called');
+        try {
+            const modeRadio = document.querySelector('input[name="pr-scan-mode"]:checked');
+            const mode = modeRadio ? modeRadio.value : 'auto';
+            console.log('[PR Auto-Scan] Mode selected:', mode);
+            
+            const startBtn = document.getElementById('pr-auto-scan-start-btn');
+            const stopBtn = document.getElementById('pr-auto-scan-stop-btn');
+            
+            if (startBtn) {
+                startBtn.disabled = true;
+                startBtn.textContent = '⏳ Starting...';
+            }
+            
+            console.log('[PR Auto-Scan] Sending request to server...');
+            const response = await fetch(`${API_URL}/pr-auto-scan/start`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: mode })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('PR Auto-scan started:', data);
+            
+            if (startBtn) {
+                startBtn.disabled = true;
+                startBtn.textContent = '🚀 PR Auto-Scan Running';
+            }
+            if (stopBtn) stopBtn.disabled = false;
+            
+            // Immediately refresh data and start polling
+            console.log('[PR Auto-Scan] Starting immediate refresh and polling...');
+            fetchPRAutoScanStatus();
+            window.refreshPRFetchedArticles();
+            window.refreshPRGeneratedArticles();
+            startPRStatusPolling();
+            
+        } catch (error) {
+            console.error('Error starting PR auto-scan:', error);
+            alert('Error starting PR auto-scan: ' + error.message);
+            const startBtn = document.getElementById('pr-auto-scan-start-btn');
+            if (startBtn) {
+                startBtn.disabled = false;
+                startBtn.textContent = '🚀 Start PR Auto-Scan';
+            }
+        }
+    };
+    
+    // Stop PR auto-scan
+    window.stopPRAutoScan = async function() {
+        try {
+            const response = await fetch(`${API_URL}/pr-auto-scan/stop`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            
+            const data = await response.json();
+            console.log('PR Auto-scan stopped:', data);
+            
+            const startBtn = document.getElementById('pr-auto-scan-start-btn');
+            const stopBtn = document.getElementById('pr-auto-scan-stop-btn');
+            
+            if (startBtn) {
+                startBtn.disabled = false;
+                startBtn.textContent = '🚀 Start PR Auto-Scan';
+            }
+            if (stopBtn) stopBtn.disabled = true;
+            
+            if (prAutoScanStatusInterval) {
+                clearInterval(prAutoScanStatusInterval);
+                prAutoScanStatusInterval = null;
+            }
+            
+            updatePRAutoScanStatus({ active: false, tickers: [], processedCount: 0, generatedCount: 0 });
+            
+        } catch (error) {
+            console.error('Error stopping PR auto-scan:', error);
+            alert('Error stopping PR auto-scan: ' + error.message);
+        }
+    };
+    
+    function startPRStatusPolling() {
+        if (prAutoScanStatusInterval) {
+            console.log('[PR Auto-Scan] Clearing existing polling interval');
+            clearInterval(prAutoScanStatusInterval);
+        }
+        
+        console.log('[PR Auto-Scan] Starting polling with immediate refresh');
+        
+        // Immediate refresh
+        fetchPRAutoScanStatus();
+        window.refreshPRFetchedArticles();
+        window.refreshPRGeneratedArticles();
+        
+        // Poll every 30 seconds for UI updates (actual PR scanning happens every 5 minutes on server)
+        prAutoScanStatusInterval = setInterval(() => {
+            // Check if section is still visible before polling
+            const section = document.getElementById('section-pr-auto-scan');
+            if (!section || section.classList.contains('hidden')) {
+                // Section hidden, stop polling
+                console.log('[PR Auto-Scan] Section hidden, stopping polling');
+                if (prAutoScanStatusInterval) {
+                    clearInterval(prAutoScanStatusInterval);
+                    prAutoScanStatusInterval = null;
+                }
+                return;
+            }
+            
+            // Polling refresh (reduced logging to avoid noise)
+            fetchPRAutoScanStatus();
+            window.refreshPRFetchedArticles();
+            window.refreshPRGeneratedArticles();
+        }, 30000); // Poll every 30 seconds for UI updates (actual PR scanning happens every 5 minutes on server)
+        
+        console.log('[PR Auto-Scan] Polling interval started');
+    }
+    
+    async function fetchPRAutoScanStatus() {
+        try {
+            const response = await fetch(`${API_URL}/pr-auto-scan/status`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const status = await response.json();
+            updatePRAutoScanStatus(status);
+        } catch (error) {
+            console.error('Error fetching PR auto-scan status:', error);
+        }
+    }
+    
+    function updatePRAutoScanStatus(status) {
+        const statusText = document.getElementById('pr-auto-scan-status-text');
+        const tickersDisplay = document.getElementById('pr-auto-scan-tickers-display');
+        const processedCount = document.getElementById('pr-auto-scan-processed-count');
+        const generatedCount = document.getElementById('pr-auto-scan-generated-count');
+        
+        if (statusText) {
+            const modeLabel = status.mode === 'manual' ? ' (Manual)' : ' (Auto)';
+            statusText.textContent = status.active ? `Running${modeLabel}` : 'Not running';
+            statusText.style.color = status.active ? '#059669' : '#64748b';
+        }
+        
+        // Update radio button to match server mode
+        if (status.mode) {
+            const modeRadio = document.getElementById(`pr-scan-mode-${status.mode}`);
+            if (modeRadio) {
+                modeRadio.checked = true;
+            }
+        }
+        
+        if (tickersDisplay) {
+            tickersDisplay.textContent = status.totalTickers 
+                ? `${status.totalTickers} tickers (${status.tickerLists || 3} queries)` 
+                : '100 tickers (3 queries)';
+        }
+        if (processedCount) processedCount.textContent = status.processedCount || 0;
+        if (generatedCount) generatedCount.textContent = status.generatedCount || 0;
+    }
+    
+    window.refreshPRFetchedArticles = async function() {
+        try {
+            const response = await fetch(`${API_URL}/pr-auto-scan/fetched-articles`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
+            displayPRFetchedArticles(data.articles || [], data.currentlyProcessingIndex);
+        } catch (error) {
+            console.error('Error refreshing PR fetched articles:', error);
+            const list = document.getElementById('pr-auto-scan-queue-list');
+            if (list) {
+                list.innerHTML = `<p style="text-align: center; color: #dc2626; padding: 2rem;">Error loading PRs: ${error.message}</p>`;
+            }
+        }
+    };
+    
+    function displayPRFetchedArticles(articles, currentlyProcessingIndex) {
+        const list = document.getElementById('pr-auto-scan-queue-list');
+        if (!list) return;
+        
+        if (articles.length === 0) {
+            list.innerHTML = '<p style="text-align: center; color: #64748b; padding: 2rem;">No PRs in queue. Start PR auto-scan to fetch press releases.</p>';
+            return;
+        }
+        
+        // Get current mode from status
+        const modeRadio = document.querySelector('input[name="pr-scan-mode"]:checked');
+        const isManualMode = modeRadio && modeRadio.value === 'manual';
+        
+        let html = '';
+        articles.forEach((item, index) => {
+            const isProcessing = index === currentlyProcessingIndex;
+            const statusColors = {
+                'queued': '#64748b',
+                'generating': '#f59e0b',
+                'completed': '#059669',
+                'failed': '#dc2626'
+            };
+            const statusLabels = {
+                'queued': '⏳ Queued',
+                'generating': item.trelloCardUrl ? '✅ Card Created' : '🔄 Creating Trello Card...',
+                'completed': '✅ Completed',
+                'failed': '❌ Failed'
+            };
+            const statusColor = statusColors[item.status] || '#64748b';
+            const statusLabel = statusLabels[item.status] || item.status;
+            
+            const date = item.published ? new Date(item.published) : null;
+            const dateStr = date ? date.toLocaleDateString() + ' ' + date.toLocaleTimeString() : 'Unknown date';
+            
+            // Show Generate Article button in manual mode for queued or failed items
+            const showGenerateButton = isManualMode && (item.status === 'queued' || item.status === 'failed');
+            const canGenerate = item.status !== 'generating' && !item.generatedArticleId;
+            
+            html += `
+                <div style="padding: 1rem; margin-bottom: 0.75rem; border: 2px solid ${isProcessing ? '#f59e0b' : '#e2e8f0'}; border-radius: 8px; background: ${isProcessing ? '#fffbeb' : 'white'};">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                                <strong style="color: var(--primary);">${escapeHtml(item.ticker || 'N/A')}</strong>
+                                <span style="font-size: 0.85rem; color: ${statusColor}; font-weight: 500;">${statusLabel}</span>
+                            </div>
+                            <h4 style="margin: 0.25rem 0; font-size: 1rem;">${escapeHtml(item.title || 'Untitled')}</h4>
+                            <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: #64748b;">${dateStr}</p>
+                        </div>
+                        ${showGenerateButton && canGenerate ? `
+                            <button onclick="window.generatePRArticle('${item.articleId}')" class="btn-primary" style="padding: 6px 12px; font-size: 0.9rem; white-space: nowrap; margin-left: 1rem;" id="generate-btn-${item.articleId}">
+                                📝 Generate Article
+                            </button>
+                        ` : item.generatedArticleId ? `
+                            <span style="padding: 6px 12px; font-size: 0.9rem; color: #059669; margin-left: 1rem;">✅ Generated</span>
+                        ` : ''}
+                    </div>
+                    ${item.error ? `<p style="margin-top: 0.5rem; padding: 0.5rem; background: #fee2e2; border-radius: 4px; color: #dc2626; font-size: 0.85rem;">Error: ${escapeHtml(item.error)}</p>` : ''}
+                </div>
+            `;
+        });
+        list.innerHTML = html;
+    }
+    
+    window.refreshPRGeneratedArticles = async function() {
+        try {
+            const response = await fetch(`${API_URL}/pr-auto-scan/articles`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
+            prGeneratedArticlesList = data.articles || [];
+            displayPRGeneratedArticles(prGeneratedArticlesList);
+        } catch (error) {
+            console.error('Error refreshing PR generated articles:', error);
+            const list = document.getElementById('pr-auto-scan-articles-list');
+            if (list) {
+                list.innerHTML = `<p style="text-align: center; color: #dc2626; padding: 2rem;">Error loading articles: ${error.message}</p>`;
+            }
+        }
+    };
+    
+    function displayPRGeneratedArticles(articles) {
+        const list = document.getElementById('pr-auto-scan-articles-list');
+        if (!list) return;
+        
+        if (articles.length === 0) {
+            list.innerHTML = '<p style="text-align: center; color: #64748b; padding: 2rem;">No articles generated yet. Start PR auto-scan to begin generating articles.</p>';
+            return;
+        }
+        
+        let html = '';
+        articles.forEach((article, idx) => {
+            const date = new Date(article.createdAt);
+            const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+            html += `
+                <div class="article-card" style="margin-bottom: 1rem; cursor: pointer; padding: 1rem; border: 1px solid #e2e8f0; border-radius: 8px; background: white;" onclick="window.viewPRGeneratedArticle('${article.id}')">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                        <div style="flex: 1;">
+                            <strong style="color: var(--primary); font-size: 1.1rem;">${escapeHtml(article.ticker || 'N/A')}</strong>
+                            <h4 style="margin: 0.5rem 0 0 0; font-size: 1rem;">${escapeHtml(article.title || 'Untitled')}</h4>
+                            <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: #64748b;">Source: ${escapeHtml(article.sourceTitle || 'Unknown')}</p>
+                        </div>
+                        <span style="font-size: 0.85rem; color: #64748b; margin-left: 1rem;">${dateStr}</span>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                        <button onclick="event.stopPropagation(); window.viewPRGeneratedArticle('${article.id}')" class="btn-primary" style="flex: 1; padding: 6px 12px; font-size: 0.85rem;">View Article</button>
+                        ${article.sourceUrl ? `<a href="${escapeHtml(article.sourceUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" class="btn-outline" style="padding: 6px 12px; font-size: 0.85rem; text-decoration: none; display: inline-block;">🔗 View PR</a>` : ''}
+                        <button onclick="event.stopPropagation(); window.copyPRGeneratedArticleById('${article.id}')" class="btn-outline" style="padding: 6px 12px; font-size: 0.85rem;">📋 Copy</button>
+                    </div>
+                </div>
+            `;
+        });
+        list.innerHTML = html;
+    }
+    
+    window.viewPRGeneratedArticle = async function(id) {
+        try {
+            const response = await fetch(`${API_URL}/pr-auto-scan/articles/${id}`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const article = await response.json();
+            window.currentGeneratedArticle = article;
+            
+            const titleEl = document.getElementById('generated-article-title');
+            if (titleEl) titleEl.textContent = `${article.ticker}: ${article.title}`;
+            
+            const display = document.getElementById('generated-article-display');
+            if (display) {
+                let articleHtml = article.generatedArticle;
+                // Add "View PR" link at the end if sourceUrl exists
+                if (article.sourceUrl) {
+                    articleHtml += `<div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0;">
+                        <a href="${escapeHtml(article.sourceUrl)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 10px 20px; background: #059669; color: white; text-decoration: none; border-radius: 6px; font-weight: 500;">
+                            🔗 View Original Press Release
+                        </a>
+                    </div>`;
+                }
+                display.innerHTML = articleHtml;
+            }
+            
+            window.showSection('section-generated-article');
+        } catch (error) {
+            console.error('Error viewing PR article:', error);
+            alert('Error loading article: ' + error.message);
+        }
+    };
+    
+    window.copyPRGeneratedArticleById = async function(id) {
+        try {
+            const response = await fetch(`${API_URL}/pr-auto-scan/articles/${id}`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const article = await response.json();
+            await navigator.clipboard.writeText(article.generatedArticle);
+            alert('Article copied to clipboard!');
+        } catch (error) {
+            console.error('Error copying PR article:', error);
+            alert('Error copying article: ' + error.message);
+        }
+    };
+
+    // EMAIL ANALYST AGENT FUNCTIONS
+    window.checkAnalystEmails = async function() {
+        const checkBtn = document.getElementById('email-analyst-check-btn');
+        const statusText = document.getElementById('email-analyst-status-text');
+        const processedCount = document.getElementById('email-analyst-processed-count');
+        const cardsCount = document.getElementById('email-analyst-cards-count');
+        const resultsDiv = document.getElementById('email-analyst-results');
+        const resultsContent = document.getElementById('email-analyst-results-content');
+        
+        if (checkBtn) {
+            checkBtn.disabled = true;
+            checkBtn.textContent = '⏳ Checking...';
+        }
+        if (statusText) {
+            statusText.textContent = 'Checking emails...';
+            statusText.style.color = '#2563eb';
+        }
+        
+        try {
+            const response = await fetch(`${API_URL}/email-analyst/check`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            // Update status
+            if (statusText) {
+                statusText.textContent = 'Completed';
+                statusText.style.color = '#16a34a';
+            }
+            if (processedCount) {
+                processedCount.textContent = data.emailsProcessed || 0;
+            }
+            if (cardsCount) {
+                cardsCount.textContent = data.cardsCreated || 0;
+            }
+            
+            // Show results
+            if (resultsDiv && resultsContent) {
+                resultsDiv.style.display = 'block';
+                if (data.cardsCreated > 0) {
+                    let html = `<p style="color: #16a34a; font-weight: 600;">✅ Successfully created ${data.cardsCreated} Trello card(s)!</p>`;
+                    if (data.cardUrls && data.cardUrls.length > 0) {
+                        html += '<ul style="margin-top: 0.5rem;">';
+                        data.cardUrls.forEach((url) => {
+                            html += `<li><a href="${url}" target="_blank" style="color: #2563eb;">${url}</a></li>`;
+                        });
+                        html += '</ul>';
+                    }
+                    resultsContent.innerHTML = html;
+                } else {
+                    resultsContent.innerHTML = `<p style="color: #64748b;">No new emails with PDFs found. The agent checked for unread emails matching your filters.</p>`;
+                }
+            }
+            
+            // Show success message
+            if (data.cardsCreated > 0) {
+                alert(`✅ Email check completed!\n\nProcessed: ${data.emailsProcessed} email(s)\nCreated: ${data.cardsCreated} Trello card(s)\n\nCheck your "Analyst Notes" Trello list.`);
+            } else {
+                alert(`✅ Email check completed!\n\nNo new emails with PDF attachments found.`);
+            }
+            
+        } catch (error) {
+            console.error('Error checking analyst emails:', error);
+            if (statusText) {
+                statusText.textContent = 'Error';
+                statusText.style.color = '#dc2626';
+            }
+            alert('Error checking emails: ' + error.message);
+        } finally {
+            if (checkBtn) {
+                checkBtn.disabled = false;
+                checkBtn.textContent = '📧 Check Emails Now';
+            }
+        }
+    };
+    
+    // Set up email analyst button click handler
+    document.addEventListener('DOMContentLoaded', function() {
+        const emailAnalystBtn = document.getElementById('btn-email-analyst');
+        if (emailAnalystBtn) {
+            emailAnalystBtn.addEventListener('click', function() {
+                console.log('[Email Analyst Button] Clicked!');
+                if (typeof window.showSection === 'function') {
+                    window.showSection('section-email-analyst');
+                } else {
+                    console.error('[Email Analyst Button] window.showSection is not a function!');
+                    alert('Error: showSection function not available. Please refresh the page.');
+                }
+            });
+            console.log('[DOMContentLoaded] ✅ Email Analyst button found, listener attached');
+        } else {
+            console.error('[DOMContentLoaded] ❌ Email Analyst button NOT found!');
+        }
+    });
+
+</script>
+
+</body>
+</html>
+

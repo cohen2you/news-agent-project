@@ -1,0 +1,45 @@
+{
+  "name": "news-agent-project",
+  "version": "1.0.0",
+  "description": "AI Agent for generating articles with human-in-the-loop approval",
+  "main": "server.ts",
+  "scripts": {
+    "dev": "powershell -ExecutionPolicy Bypass -File kill-port.ps1 && timeout /t 2 /nobreak >nul && tsx watch server.ts",
+    "dev:clean": "powershell -ExecutionPolicy Bypass -File kill-port.ps1 && timeout /t 2 /nobreak >nul && tsx watch server.ts",
+    "start": "powershell -ExecutionPolicy Bypass -File kill-port.ps1 && timeout /t 2 /nobreak >nul && tsx server.ts",
+    "start:clean": "powershell -ExecutionPolicy Bypass -File kill-port.ps1 && timeout /t 2 /nobreak >nul && tsx server.ts",
+    "agent": "tsx agent.ts",
+    "get-trello-ids": "tsx get-trello-ids.ts",
+    "kill-port": "powershell -ExecutionPolicy Bypass -File kill-port.ps1"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "langgraph",
+    "news",
+    "articles"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@langchain/core": "^0.3.0",
+    "@langchain/langgraph": "^0.2.0",
+    "axios": "^1.6.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "form-data": "^4.0.5",
+    "imap": "^0.8.19",
+    "langchain": "^0.3.0",
+    "mailparser": "^3.6.5",
+    "pdf-parse": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/imap": "^0.8.40",
+    "@types/node": "^20.10.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}
