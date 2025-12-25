@@ -229,7 +229,7 @@ export class EmailService {
                 }
 
                 // Extract attachments if any
-                const attachments = parsed.attachments?.map(att => ({
+                const attachments = parsed.attachments?.map((att: any) => ({
                   filename: att.filename || 'attachment',
                   contentType: att.contentType || 'application/octet-stream',
                   size: att.size || 0,
@@ -256,7 +256,7 @@ export class EmailService {
                   resolve(emails);
                 }
               })
-              .catch((parseErr) => {
+              .catch((parseErr: any) => {
                 console.error(`❌ Error parsing email ${seqno}:`, parseErr);
                 processedCount++;
                 if (processedCount === results.length) {

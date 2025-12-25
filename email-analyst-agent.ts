@@ -78,7 +78,7 @@ const extractNotesNode = async (state: typeof EmailAnalystAgentState.State) => {
       // Find ALL PDF attachments (not just the first one)
       const pdfAttachments: any[] = [];
       if (email.attachments && email.attachments.length > 0) {
-        const pdfAtts = email.attachments.filter(att => 
+        const pdfAtts = email.attachments.filter((att: any) => 
           att.contentType === 'application/pdf' || 
           att.filename?.toLowerCase().endsWith('.pdf')
         );

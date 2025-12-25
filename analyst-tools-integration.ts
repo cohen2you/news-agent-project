@@ -297,7 +297,7 @@ export async function generateAnalystStory(
         throw new Error(`Story generator error: ${response.status} ${response.statusText} - ${errorText.substring(0, 200)}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as any;
       console.log(`   ✅ Story generator response keys: ${Object.keys(data).join(', ')}`);
 
       // The endpoint returns: { article: string, headline: string }

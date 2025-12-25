@@ -160,7 +160,7 @@ const wgoTrelloPitchNode = async (state: typeof WGOAgentState.State) => {
       
       try {
         // Extract ticker from article - prioritize the topic ticker if it exists in stocks array
-        let ticker = null;
+        let ticker: string | undefined = undefined;
         const topicUpper = state.topic ? state.topic.toUpperCase().trim() : null;
         
         if (article.stocks && Array.isArray(article.stocks) && article.stocks.length > 0) {

@@ -6,6 +6,7 @@
 interface BenzingaArticle {
   id: string;
   title: string;
+  headline?: string; // Optional, falls back to title
   created: number;
   updated: number;
   teaser: string;

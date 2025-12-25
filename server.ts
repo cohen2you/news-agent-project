@@ -2011,7 +2011,7 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
             console.log(`   🌐 API fetch failed - attempting to scrape article from URL...`);
             try {
               const { scrapeBenzingaArticleByUrl } = await import("./benzinga-api");
-              sourceData = await scrapeBenzingaArticleByUrl(cardDescriptionUrl);
+              sourceData = await scrapeBenzingaArticleByUrl(cardDescriptionUrl!);
               
               if (sourceData) {
                 console.log(`   ✅ Successfully scraped article: ${sourceData.title}`);
@@ -2042,10 +2042,10 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
             }
             
             sourceData = {
-              id: cardDescriptionUrl.split('/').pop() || 'unknown',
+              id: cardDescriptionUrl!.split('/').pop() || 'unknown',
               title: cardTitle,
               headline: cardTitle,
-              url: cardDescriptionUrl,
+              url: cardDescriptionUrl!,
               body: '', // Will be populated from pitch/URL
               teaser: '',
               created: Math.floor(Date.now() / 1000),
@@ -2406,7 +2406,7 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
     // Determine which app to use based on data type and query parameter
     // PRIORITY: Query parameter > Detection logic
     // If selectedApp is explicitly provided in the URL, trust it over auto-detection
-    let appToUse = selectedApp;
+    let appToUse: string | undefined = typeof selectedApp === 'string' ? selectedApp : undefined;
     
     // Only use auto-detection if selectedApp wasn't explicitly provided or is the default
     // This ensures that PR cards with selectedApp=story and WGO cards with selectedApp=wgo are respected
@@ -2556,7 +2556,7 @@ Proposed Angle: Provide technical analysis and market insights${ticker ? ` for $
     // Generate article
     const generatedArticle = await generateArticle(
       pitch,
-      appToUse,
+      appToUse || 'default',
       ticker || undefined,
       [sourceData],
       sourceData,
@@ -2708,7 +2708,7 @@ Proposed Angle: Provide technical analysis and market insights${ticker ? ` for $
           sourceMaterial: sourceData,
           originalPrompt: pitch,
           revisionCount: 0,
-          writerApp: appToUse,
+          writerApp: appToUse || 'default',
           writerConfig: {
             ticker: ticker || undefined,
             newsArticles: [sourceData],
@@ -6648,7 +6648,7 @@ Proposed Angle: Analyze the implications of this press release${prTicker ? ` for
   }
 }
 
-const PORT = process.env.PORT || 3001;
+const PORT = parseInt(process.env.PORT || '3001', 10);
 
 // Function to check and kill process on port if needed (more aggressive)
 async function ensurePortIsFree(port: number): Promise<boolean> {

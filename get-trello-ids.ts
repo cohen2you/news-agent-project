@@ -10,6 +10,12 @@ import { existsSync } from "fs";
 import { join } from "path";
 import { TrelloService } from "./trello-service";
 
+interface TrelloBoard {
+  id: string;
+  name: string;
+  url: string;
+}
+
 // Load environment variables
 const envLocalPath = join(process.cwd(), ".env.local");
 const envPath = join(process.cwd(), ".env");

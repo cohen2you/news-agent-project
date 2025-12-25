@@ -377,9 +377,7 @@ const escalateToHumanNode = async (state: typeof EditorAgentState.State) => {
     
     // Build escalation section (with length limits to prevent Trello API errors)
     const appUrl = process.env.APP_URL || 'http://localhost:3001';
-    const articleViewUrl = state.generatedArticleId 
-      ? `${appUrl}/pr-auto-scan/articles/${state.generatedArticleId}`
-      : state.articleId 
+    const articleViewUrl = state.articleId 
         ? `${appUrl}/pr-auto-scan/articles/${state.articleId}`
         : `${appUrl}/pr-auto-scan/articles`; // Fallback
     
