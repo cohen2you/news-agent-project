@@ -2355,7 +2355,7 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
             if (apiKey) {
               try {
                 const { fetchBenzingaArticleByUrl } = await import("./benzinga-api");
-                const correctArticle = await fetchBenzingaArticleByUrl(cardDescriptionUrl, apiKey);
+                const correctArticle = await fetchBenzingaArticleByUrl(cardDescriptionUrl!, apiKey);
                 
                 if (correctArticle) {
                   console.log(`   ✅ Re-fetched correct article: ${correctArticle.title}`);
