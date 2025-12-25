@@ -2750,116 +2750,54 @@ Proposed Angle: Provide technical analysis and market insights${ticker ? ` for $
       throw storageError; // Re-throw to be caught by outer error handler
     }
     
-    // Call Editor Agent to review the article (unless disabled)
-    const editorDisabled = process.env.DISABLE_EDITOR_AGENT === 'true';
+    // Skip old editor review - articles go directly to Submitted
+    // Number verification will run automatically when card is moved to Submitted
+    console.log(`   ✅ Article generated - moving directly to Submitted list`);
+    console.log(`   🔗 Article will be available at: ${process.env.APP_URL || 'http://localhost:3001'}/pr-auto-scan/articles/${generatedId}`);
     
-    if (editorDisabled) {
-      console.log(`   ⚠️  Editor Agent is DISABLED (DISABLE_EDITOR_AGENT=true) - skipping review`);
-      console.log(`   🔗 Article will be available at: ${process.env.APP_URL || 'http://localhost:3001'}/pr-auto-scan/articles/${generatedId}`);
+    const appUrl = process.env.APP_URL || 'http://localhost:3001';
+    const articleViewUrl = `${appUrl}/pr-auto-scan/articles/${generatedId}`;
+    
+    try {
+      console.log(`   📝 Updating Trello card description with article link...`);
+      const cardData = await trello.getCardData(cardId);
+      let updatedDesc = cardData.desc || '';
+      updatedDesc = updatedDesc.replace(/\n\n---\n\n\*\*\[Generate Article\]\([^)]+\)\*\*/g, '');
+      updatedDesc += `\n\n---\n\n## ✅ Article Generated\n\n`;
+      updatedDesc += `**Title:** ${generatedTitle}\n\n`;
+      updatedDesc += `**View Article:** [View Generated Article](${articleViewUrl})\n\n`;
+      updatedDesc += `**Generated:** ${new Date().toLocaleString()}\n`;
       
-      // Skip editor and go directly to Submitted
-      const appUrl = process.env.APP_URL || 'http://localhost:3001';
-      const articleViewUrl = `${appUrl}/pr-auto-scan/articles/${generatedId}`;
+      await trello.updateCardDescription(cardId, updatedDesc);
+      console.log(`   ✅ Card description updated successfully (length: ${updatedDesc.length} chars)`);
+      console.log(`   🔗 Article link: ${articleViewUrl}`);
       
+      // Add comment with article preview
+      const articlePreview = generatedArticle
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .substring(0, 500);
+      const commentText = `**✅ Article Generated**\n\n**Title:** ${generatedTitle}\n\n**Preview:** ${articlePreview}...\n\n[View Full Article](${articleViewUrl})`;
       try {
-        console.log(`   📝 Updating Trello card description with article link...`);
-        const cardData = await trello.getCardData(cardId);
-        let updatedDesc = cardData.desc || '';
-        updatedDesc = updatedDesc.replace(/\n\n---\n\n\*\*\[Generate Article\]\([^)]+\)\*\*/g, '');
-        updatedDesc += `\n\n---\n\n## ✅ Article Generated (Editor Review Disabled)\n\n`;
-        updatedDesc += `**Title:** ${generatedTitle}\n\n`;
-        updatedDesc += `**View Article:** [View Generated Article](${articleViewUrl})\n\n`;
-        updatedDesc += `**Generated:** ${new Date().toLocaleString()}\n`;
-        updatedDesc += `\nℹ️ Editor review was disabled for testing.\n`;
-        
-        await trello.updateCardDescription(cardId, updatedDesc);
-        console.log(`   ✅ Card description updated successfully (length: ${updatedDesc.length} chars)`);
-        console.log(`   🔗 Article link: ${articleViewUrl}`);
-        
-        // Add comment with article preview (like editor does)
-        const articlePreview = generatedArticle
-          .replace(/<[^>]+>/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim()
-          .substring(0, 500);
-        const commentText = `**✅ Article Generated (Editor Disabled)**\n\n**Title:** ${generatedTitle}\n\n**Preview:** ${articlePreview}...\n\n[View Full Article](${articleViewUrl})`;
-        try {
-          await trello.addComment(cardId, commentText);
-          console.log(`   ✅ Added article preview comment to card`);
-        } catch (commentError: any) {
-          console.warn(`   ⚠️  Could not add comment:`, commentError.message);
-        }
-        
-        const submittedListId = process.env.TRELLO_LIST_ID_SUBMITTED;
-        if (submittedListId) {
-          await trello.moveCardToList(cardId, submittedListId);
-          console.log(`   ✅ Moved card to Submitted list (editor disabled)`);
-        } else {
-          console.warn(`   ⚠️  TRELLO_LIST_ID_SUBMITTED not set - card not moved to Submitted`);
-        }
-      } catch (fallbackError: any) {
-        console.error(`   ❌ Error updating card (editor disabled):`, fallbackError);
-        console.error(`   ❌ Error details:`, fallbackError.message);
-        console.error(`   ❌ Stack trace:`, fallbackError.stack);
+        await trello.addComment(cardId, commentText);
+        console.log(`   ✅ Added article preview comment to card`);
+      } catch (commentError: any) {
+        console.warn(`   ⚠️  Could not add comment:`, commentError.message);
       }
-    } else {
-      console.log(`   📝 Calling Editor Agent to review article...`);
-      console.log(`   🔗 Article will be available at: ${process.env.APP_URL || 'http://localhost:3001'}/pr-auto-scan/articles/${generatedId}`);
-      try {
-        const editorThreadId = `editor_run_${cardId}_${Date.now()}`;
-        const editorConfig = { configurable: { thread_id: editorThreadId } };
-        
-        await editorGraph.invoke({
-          cardId,
-          articleId: generatedId,
-          articleContent: generatedArticle,
-          sourceMaterial: sourceData,
-          originalPrompt: pitch,
-          revisionCount: 0,
-          writerApp: appToUse || 'default',
-          writerConfig: {
-            ticker: ticker || undefined,
-            newsArticles: [sourceData],
-            selectedArticle: sourceData,
-            manualTicker: ticker || undefined,
-          },
-          allRevisionFeedback: [],
-          reviewResult: '',
-          reviewNotes: '',
-          reviewIssues: [],
-          reviewSummary: '',
-          revisionFeedback: '',
-          finalArticle: null,
-          escalationReason: '',
-        }, editorConfig);
-        
-        console.log(`   ✅ Editor Agent completed review`);
-      } catch (editorError: any) {
-        console.error(`   ⚠️  Editor Agent error (article still generated):`, editorError);
-        // If editor fails, fall back to old behavior (direct to Submitted)
-        // This ensures articles aren't lost if editor has issues
-        const appUrl = process.env.APP_URL || 'http://localhost:3001';
-        const articleViewUrl = `${appUrl}/pr-auto-scan/articles/${generatedId}`;
-        
-        try {
-          const cardData = await trello.getCardData(cardId);
-          let updatedDesc = cardData.desc || '';
-          updatedDesc = updatedDesc.replace(/\n\n---\n\n\*\*\[Generate Article\]\([^)]+\)\*\*/g, '');
-          updatedDesc += `\n\n---\n\n## ✅ Article Generated (Editor Review Skipped)\n\n`;
-          updatedDesc += `**Title:** ${generatedTitle}\n\n`;
-          updatedDesc += `**View Article:** [View Generated Article](${articleViewUrl})\n\n`;
-          updatedDesc += `**Generated:** ${new Date().toLocaleString()}\n`;
-          updatedDesc += `\n⚠️ Editor review failed: ${editorError.message}\n`;
-          await trello.updateCardDescription(cardId, updatedDesc);
-          
-          const submittedListId = process.env.TRELLO_LIST_ID_SUBMITTED;
-          if (submittedListId) {
-            await trello.moveCardToList(cardId, submittedListId);
-          }
-        } catch (fallbackError: any) {
-          console.error(`   ❌ Fallback error:`, fallbackError);
-        }
+      
+      const submittedListId = process.env.TRELLO_LIST_ID_SUBMITTED;
+      if (submittedListId) {
+        await trello.moveCardToList(cardId, submittedListId);
+        console.log(`   ✅ Moved card to Submitted list`);
+        console.log(`   ℹ️  Number verification will run automatically when card is moved to Submitted`);
+      } else {
+        console.warn(`   ⚠️  TRELLO_LIST_ID_SUBMITTED not set - card not moved to Submitted`);
       }
+    } catch (error: any) {
+      console.error(`   ❌ Error updating card:`, error);
+      console.error(`   ❌ Error details:`, error.message);
+      console.error(`   ❌ Stack trace:`, error.stack);
     }
     
         // Article generation completed in background
