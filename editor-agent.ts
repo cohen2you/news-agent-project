@@ -1,7 +1,7 @@
 /**
  * Editor Agent
- * Reviews writer-generated articles, validates against source material and prompt,
- * implements retry loop (max 3 revisions), and escalates to human review after 3 failures.
+ * Number Verification Mode: Verifies numerical data (percentages, dollar amounts, dates, counts)
+ * between source material and generated article. No revisions - only reports discrepancies.
  */
 
 import {
@@ -15,31 +15,20 @@ import { ChatOpenAI } from "@langchain/openai";
 import { generateArticle } from "./article-generator-integration";
 import { TrelloService } from "./trello-service";
 
-// Editor Agent State
+// Editor Agent State (Number Verification Mode)
 const EditorAgentState = Annotation.Root({
   // Inputs
   cardId: Annotation<string>,                    // Trello card ID
   articleId: Annotation<string>,                 // Generated article ID (for viewing)
   articleContent: Annotation<string>,            // Generated article HTML
   sourceMaterial: Annotation<any>,              // Original PR/news/analyst note
-  originalPrompt: Annotation<string>,           // Original pitch/prompt
   
-  // Editor State
-  revisionCount: Annotation<number>,            // 0-3, tracks revision attempts
-  revisionFeedback: Annotation<string>,         // Feedback from editor to writer
-  reviewResult: Annotation<string>,             // "approved" | "needs_revision" | "escalated"
-  reviewNotes: Annotation<string>,              // Editor's detailed review notes
-  reviewIssues: Annotation<string[]>,           // List of specific issues found
-  allRevisionFeedback: Annotation<string[]>,    // History of all revision feedback
-  reviewSummary: Annotation<string>,            // Summary of review checks performed
-  
-  // Writer Integration
-  writerApp: Annotation<string>,                // Which writer app to use for regeneration
-  writerConfig: Annotation<any>,                // Writer configuration (ticker, etc.)
-  
-  // Output
-  finalArticle: Annotation<string | null>,      // Final approved article (or null if escalated)
-  escalationReason: Annotation<string>,         // Why it was escalated
+  // Verification Results
+  verificationStatus: Annotation<string>,        // "verified" | "discrepancies_found"
+  verificationSummary: Annotation<string>,       // Summary of verification
+  verifiedNumbers: Annotation<number>,           // Count of matching numbers
+  discrepancies: Annotation<string[]>,           // List of discrepancies found
+  verificationNotes: Annotation<string>,         // Detailed verification notes
 });
 
 // Initialize LLM for editor reviews
@@ -58,8 +47,8 @@ const getEditorLLM = () => {
   });
 };
 
-// NODE 1: Review Article - Uses LLM to review the article
-const reviewArticleNode = async (state: typeof EditorAgentState.State) => {
+// NODE 1: Verify Numbers - Extracts and compares numbers from source vs article
+const verifyNumbersNode = async (state: typeof EditorAgentState.State) => {
   console.log(`\n📝 EDITOR: Reviewing article (Revision ${state.revisionCount + 1} of 3)`);
   
   try {

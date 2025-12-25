@@ -115,6 +115,7 @@ import { wgoGraph } from "./wgo-agent"; // Import the WGO-specific agent
 import { graph as emailAnalystGraph } from "./email-analyst-agent"; // Import the Email Analyst agent
 import { graph as analystStoryGraph } from "./analyst-story-agent"; // Import the Analyst Story Generator agent
 import { editorGraph } from "./editor-agent"; // Import the Editor agent
+import { numberVerificationGraph } from "./editor-number-verification-agent"; // Import the Number Verification agent
 import { readFileSync } from "fs";
 import { exec } from "child_process";
 import { createServer } from "net";
@@ -1231,11 +1232,117 @@ app.post("/trello/webhook", async (req, res) => {
       
       const cardId = cardData.id;
       const listId = cardData.idList;
+      const previousListId = action.data?.cardBefore?.idList;
       
       console.log(`   📋 Card ID: ${cardId}`);
       console.log(`   📋 List ID: ${listId}`);
+      console.log(`   📋 Previous List ID: ${previousListId || 'N/A'}`);
       
-      // Check if card is in PR or WGO list
+      // Check if card was moved to "Submitted" list (trigger for number verification)
+      const submittedListId = process.env.TRELLO_LIST_ID_SUBMITTED;
+      const verificationEnabled = process.env.EDITOR_NUMBER_VERIFICATION_ENABLED === 'true';
+      
+      if (submittedListId && verificationEnabled && listId === submittedListId && previousListId && previousListId !== submittedListId) {
+        console.log(`   ✅ Card moved to Submitted list - triggering number verification...`);
+        
+        // Trigger number verification in background
+        (async () => {
+          try {
+            const { TrelloService } = await import("./trello-service");
+            const trello = new TrelloService();
+            
+            // Get card data
+            const cardInfo = await trello.getCardData(cardId);
+            const cardDesc = cardInfo.desc || '';
+            
+            // Extract article content from card description or stored articles
+            let articleContent = '';
+            let sourceMaterial: any = null;
+            
+            // Try to find article in stored articles by looking for article view URLs in description
+            const articleUrlMatch = cardDesc.match(/\/pr-auto-scan\/articles\/([a-zA-Z0-9_]+)/);
+            const analystStoryUrlMatch = cardDesc.match(/\/analyst-story\/view\/([a-zA-Z0-9_]+)/);
+            
+            if (articleUrlMatch) {
+              const articleId = articleUrlMatch[1];
+              const storedArticle = prGeneratedArticles.find(a => a.id === articleId);
+              if (storedArticle) {
+                articleContent = storedArticle.generatedArticle;
+                sourceMaterial = storedArticle.sourceArticle;
+                console.log(`   ✅ Found article in storage: ${articleId}`);
+              }
+            } else if (analystStoryUrlMatch) {
+              const storyId = analystStoryUrlMatch[1];
+              const storedStory = analystGeneratedStories.get(storyId);
+              if (storedStory) {
+                articleContent = storedStory.story;
+                sourceMaterial = storedStory.noteData;
+                console.log(`   ✅ Found analyst story in storage: ${storyId}`);
+              }
+            }
+            
+            // If not found in storage, try to extract from card description (may be embedded)
+            if (!articleContent && cardDesc.includes('<h')) {
+              // Article HTML might be in description
+              const htmlMatch = cardDesc.match(/(<h[1-6][\s\S]*?<\/h[1-6]>[\s\S]*?)(?=\n\n---|$)/);
+              if (htmlMatch) {
+                articleContent = htmlMatch[1];
+                console.log(`   ✅ Extracted article HTML from card description`);
+              }
+            }
+            
+            // Extract source material from PR_DATA or NOTE_DATA
+            if (!sourceMaterial) {
+              const prDataMatch = cardDesc.match(/<!--\s*PR_DATA:\s*([^>]+)\s*-->/);
+              const noteDataMatch = cardDesc.match(/<!--\s*NOTE_DATA:\s*([^>]+)\s*-->/);
+              
+              if (prDataMatch || noteDataMatch) {
+                try {
+                  const dataStr = decodeURIComponent((prDataMatch || noteDataMatch)![1]);
+                  sourceMaterial = JSON.parse(dataStr);
+                  console.log(`   ✅ Extracted source material from card metadata`);
+                } catch (parseError) {
+                  console.warn(`   ⚠️  Could not parse source material from card: ${parseError}`);
+                }
+              }
+            }
+            
+            if (!articleContent) {
+              console.warn(`   ⚠️  Could not find article content for verification - skipping`);
+              return;
+            }
+            
+            if (!sourceMaterial) {
+              console.warn(`   ⚠️  Could not find source material for verification - skipping`);
+              return;
+            }
+            
+            // Trigger number verification agent
+            const verificationThreadId = `verification_${cardId}_${Date.now()}`;
+            const verificationConfig = { configurable: { thread_id: verificationThreadId } };
+            
+            await numberVerificationGraph.invoke({
+              cardId,
+              articleContent,
+              sourceMaterial,
+              verificationStatus: '',
+              verificationSummary: '',
+              verifiedNumbers: 0,
+              discrepancies: [],
+              verificationNotes: '',
+            }, verificationConfig);
+            
+            console.log(`   ✅ Number verification completed for card ${cardId}`);
+          } catch (verifyError: any) {
+            console.error(`   ❌ Error in number verification:`, verifyError);
+            // Don't throw - just log the error
+          }
+        })();
+        
+        return res.status(200).json({ received: true });
+      }
+      
+      // Check if card is in PR or WGO list (existing logic for "Process For AI" button)
       const prListId = process.env.TRELLO_LIST_ID_PR;
       const wgoListId = process.env.TRELLO_LIST_ID_WGO;
       const isPRList = prListId && listId === prListId;
