@@ -548,11 +548,11 @@ The selected article generation app will determine the word count based on its c
       return dateB - dateA; // Most recent first
     });
     
-    // Filter articles to only include those from the last 7 days
-    const sevenDaysAgo = Date.now() / 1000 - (7 * 24 * 60 * 60);
+    // Filter articles to only include those from the last 30 days (increased from 7 days for WGO searches)
+    const thirtyDaysAgo = Date.now() / 1000 - (30 * 24 * 60 * 60);
     const recentArticlesFiltered = sortedArticles.filter(article => {
       const articleDate = article.created || 0;
-      return articleDate >= sevenDaysAgo;
+      return articleDate >= thirtyDaysAgo;
     });
 
     // Log the date range of articles found (before filtering)
@@ -567,14 +567,14 @@ The selected article generation app will determine the word count based on its c
     if (recentArticlesFiltered.length > 0) {
       const newestFiltered = new Date(recentArticlesFiltered[0].created * 1000);
       const oldestFiltered = new Date(recentArticlesFiltered[recentArticlesFiltered.length - 1].created * 1000);
-      console.log(`📅 Filtered articles (last 7 days): ${oldestFiltered.toLocaleDateString()} to ${newestFiltered.toLocaleDateString()}`);
+      console.log(`📅 Filtered articles (last 30 days): ${oldestFiltered.toLocaleDateString()} to ${newestFiltered.toLocaleDateString()}`);
       console.log(`   Most recent article: "${recentArticlesFiltered[0].title?.substring(0, 60)}..." (${newestFiltered.toLocaleDateString()})`);
     }
 
     // Take the top 10 most recent from the filtered list
     const recentArticles = recentArticlesFiltered.slice(0, 10);
     
-    console.log(`✅ Found ${recentArticles.length} most recent articles for ${topic} (filtered from ${recentArticlesFiltered.length} articles in last 7 days, out of ${articles.length} total)`);
+    console.log(`✅ Found ${recentArticles.length} most recent articles for ${topic} (filtered from ${recentArticlesFiltered.length} articles in last 30 days, out of ${articles.length} total)`);
     
     // Generate a simple pitch from the most recent article
     const topArticle = recentArticles[0];
