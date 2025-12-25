@@ -2,9 +2,11 @@
 
 ## Quick Setup
 
-1. **In Render Dashboard - Service Settings:**
+1. **In Render Dashboard - Service Settings → Build & Deploy:**
    - **Build Command:** `npm install && npm run build`
-   - **Start Command:** `npm start`
+     - ⚠️ **CRITICAL:** Must include `&& npm run build` to compile TypeScript
+   - **Start Command:** `npm start` (or `node dist/server.js`)
+     - ⚠️ **CRITICAL:** Must use compiled JavaScript, NOT `node server.ts`
    - **Node Version:** 22.16.0 (or 18+)
 
 2. **Environment Variables to Add:**
