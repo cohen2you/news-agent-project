@@ -67,9 +67,10 @@ if (existsSync(envLocalPath)) {
     console.log("⚠️  TRELLO_LIST_ID_SUBMITTED not found (cards won't auto-move after generation)");
   }
   
-  if (process.env.DISABLE_EDITOR_AGENT === 'true') {
-    console.log("⚠️  EDITOR AGENT IS DISABLED - Articles will skip review and go directly to Submitted");
-  }
+  // Old editor agent is disabled by default - articles go directly to Submitted
+  // Number verification runs automatically when cards are moved to Submitted
+  console.log("ℹ️  Old editor agent is disabled - articles go directly to Submitted");
+  console.log("ℹ️  Number verification runs automatically when cards are moved to Submitted");
   
   if (process.env.TRELLO_LIST_ID_IN_PROGRESS) {
     console.log(`✅ Found TRELLO_LIST_ID_IN_PROGRESS: ${process.env.TRELLO_LIST_ID_IN_PROGRESS}`);
@@ -3305,49 +3306,10 @@ app.get("/analyst-story/generate/:cardId", async (req, res) => {
         // - Moving card to Submitted list
         // So we don't need to duplicate that here
         
-        // However, if Editor Agent is enabled, we should call it for review
-        // But the agent already moved the card to Submitted, so we need to handle this carefully
-        const editorDisabled = process.env.DISABLE_EDITOR_AGENT === 'true';
-        
-        if (!editorDisabled) {
-          console.log(`   📝 Editor Agent is ENABLED - calling for review...`);
-          console.log(`   ⚠️  NOTE: Card was already moved to Submitted by analyst story agent`);
-          console.log(`   ⚠️  Editor Agent will move it to Needs Review if issues are found`);
-          
-          try {
-            const generatedId = `analyst_gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            const editorThreadId = `editor_analyst_run_${cardId}_${Date.now()}`;
-            const editorConfig = { configurable: { thread_id: editorThreadId } };
-            
-            await editorGraph.invoke({
-              cardId,
-              articleId: generatedId,
-              articleContent: typeof generatedStory === 'string' ? generatedStory : generatedStory.story || '',
-              sourceMaterial: state.values.noteData,
-              originalPrompt: state.values.extractedData ? JSON.stringify(state.values.extractedData, null, 2) : state.values.noteData?.content || '',
-              revisionCount: 0,
-              writerApp: "analyst-article",
-              writerConfig: {
-                ticker: state.values.noteData?.ticker,
-              },
-              allRevisionFeedback: [],
-              reviewResult: '',
-              reviewNotes: '',
-              reviewIssues: [],
-              reviewSummary: '',
-              revisionFeedback: '',
-              finalArticle: null,
-              escalationReason: '',
-            }, editorConfig);
-            
-            console.log(`   ✅ Editor Agent completed review`);
-          } catch (editorError: any) {
-            console.error(`   ⚠️  Editor Agent error (story still generated and card moved to Submitted):`, editorError);
-            // Story is already generated and card is already in Submitted, so this is just a warning
-          }
-        } else {
-          console.log(`   ⚠️  Editor Agent is DISABLED - card already moved to Submitted by analyst story agent`);
-        }
+        // Skip old editor review - stories go directly to Submitted
+        // Number verification will run automatically when card is moved to Submitted
+        console.log(`   ✅ Story generated - card already moved to Submitted by analyst story agent`);
+        console.log(`   ℹ️  Number verification will run automatically when card is moved to Submitted`);
         
         console.log(`   ✅ Background analyst story generation completed`);
       } catch (error: any) {
