@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: news-agent-project
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Add your environment variables in Render dashboard instead of here
+      # This keeps sensitive data secure
+

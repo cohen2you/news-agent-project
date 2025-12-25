@@ -3,6 +3,9 @@ import dotenv from "dotenv";
 import { existsSync } from "fs";
 import { join } from "path";
 
+// Declare __dirname for TypeScript (available in CommonJS runtime)
+declare const __dirname: string;
+
 // Load .env.local first (if exists), then fall back to .env
 const envLocalPath = join(process.cwd(), ".env.local");
 const envPath = join(process.cwd(), ".env");
@@ -593,8 +596,10 @@ app.post("/approve", async (req, res) => {
 app.get("/", (req, res) => {
   console.log("\n📄 [GET /] Serving index.html");
   try {
-    // Use process.cwd() to get the project root directory
-    const htmlPath = join(process.cwd(), "index.html");
+    // Try dist folder first (for production builds), then fall back to project root (for development)
+    const distHtmlPath = join(__dirname, "index.html");
+    const rootHtmlPath = join(process.cwd(), "index.html");
+    const htmlPath = existsSync(distHtmlPath) ? distHtmlPath : rootHtmlPath;
     console.log(`📄 [GET /] Reading HTML from: ${htmlPath}`);
     const html = readFileSync(htmlPath, "utf-8");
     console.log(`📄 [GET /] ✅ HTML file loaded (${html.length} bytes)`);
