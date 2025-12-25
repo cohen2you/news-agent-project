@@ -70,7 +70,11 @@ if (existsSync(envLocalPath)) {
   // Old editor agent is disabled by default - articles go directly to Submitted
   // Number verification runs automatically when cards are moved to Submitted
   console.log("ℹ️  Old editor agent is disabled - articles go directly to Submitted");
-  console.log("ℹ️  Number verification runs automatically when cards are moved to Submitted");
+  if (process.env.EDITOR_NUMBER_VERIFICATION_ENABLED === 'true') {
+    console.log("✅ Number verification is ENABLED - will run automatically when cards are moved to Submitted");
+  } else {
+    console.log("⚠️  Number verification is DISABLED - set EDITOR_NUMBER_VERIFICATION_ENABLED=true to enable");
+  }
   
   if (process.env.TRELLO_LIST_ID_IN_PROGRESS) {
     console.log(`✅ Found TRELLO_LIST_ID_IN_PROGRESS: ${process.env.TRELLO_LIST_ID_IN_PROGRESS}`);
@@ -1242,6 +1246,14 @@ app.post("/trello/webhook", async (req, res) => {
       // Check if card was moved to "Submitted" list (trigger for number verification)
       const submittedListId = process.env.TRELLO_LIST_ID_SUBMITTED;
       const verificationEnabled = process.env.EDITOR_NUMBER_VERIFICATION_ENABLED === 'true';
+      
+      console.log(`   🔍 Number Verification Check:`);
+      console.log(`      - Submitted List ID: ${submittedListId || 'NOT SET'}`);
+      console.log(`      - Verification Enabled: ${verificationEnabled}`);
+      console.log(`      - Current List ID: ${listId}`);
+      console.log(`      - Previous List ID: ${previousListId || 'N/A'}`);
+      console.log(`      - Is Submitted List: ${listId === submittedListId}`);
+      console.log(`      - Was Moved: ${previousListId && previousListId !== submittedListId}`);
       
       if (submittedListId && verificationEnabled && listId === submittedListId && previousListId && previousListId !== submittedListId) {
         console.log(`   ✅ Card moved to Submitted list - triggering number verification...`);
