@@ -217,6 +217,41 @@ const updateTrelloNode = async (state: typeof AnalystStoryAgentState.State) => {
       try {
         await trello.moveCardToList(state.cardId, submittedListId);
         console.log(`   ✅ Moved card to Submitted list`);
+        
+        // Trigger number verification directly (since we moved it programmatically, webhook might not fire)
+        const verificationEnabled = process.env.EDITOR_NUMBER_VERIFICATION_ENABLED === 'true';
+        if (verificationEnabled && state.generatedStory && state.noteData) {
+          console.log(`   🔢 Triggering number verification directly...`);
+          (async () => {
+            try {
+              const { numberVerificationGraph } = await import("./editor-number-verification-agent");
+              const verificationThreadId = `verification_${state.cardId}_${Date.now()}`;
+              const verificationConfig = { configurable: { thread_id: verificationThreadId } };
+              
+              await numberVerificationGraph.invoke({
+                cardId: state.cardId,
+                articleContent: state.generatedStory,
+                sourceMaterial: state.noteData,
+                verificationStatus: '',
+                verificationSummary: '',
+                verifiedNumbers: 0,
+                discrepancies: [],
+                verificationNotes: '',
+              }, verificationConfig);
+              
+              console.log(`   ✅ Number verification completed for card ${state.cardId}`);
+            } catch (verifyError: any) {
+              console.error(`   ❌ Error in number verification:`, verifyError);
+              console.error(`   ❌ Error message: ${verifyError.message}`);
+            }
+          })();
+        } else {
+          if (!verificationEnabled) {
+            console.log(`   ℹ️  Number verification is disabled (EDITOR_NUMBER_VERIFICATION_ENABLED not set to 'true')`);
+          } else {
+            console.log(`   ⚠️  Cannot verify: missing story content or note data`);
+          }
+        }
       } catch (moveError: any) {
         console.warn(`   ⚠️  Error moving card to Submitted:`, moveError.message);
       }

@@ -2802,7 +2802,37 @@ Proposed Angle: Provide technical analysis and market insights${ticker ? ` for $
       if (submittedListId) {
         await trello.moveCardToList(cardId, submittedListId);
         console.log(`   ✅ Moved card to Submitted list`);
-        console.log(`   ℹ️  Number verification will run automatically when card is moved to Submitted`);
+        
+        // Trigger number verification directly (since we moved it programmatically, webhook might not fire)
+        const verificationEnabled = process.env.EDITOR_NUMBER_VERIFICATION_ENABLED === 'true';
+        if (verificationEnabled) {
+          console.log(`   🔢 Triggering number verification directly...`);
+          (async () => {
+            try {
+              const verificationThreadId = `verification_${cardId}_${Date.now()}`;
+              const verificationConfig = { configurable: { thread_id: verificationThreadId } };
+              
+              await numberVerificationGraph.invoke({
+                cardId,
+                articleContent: generatedArticle,
+                sourceMaterial: sourceData,
+                verificationStatus: '',
+                verificationSummary: '',
+                verifiedNumbers: 0,
+                discrepancies: [],
+                verificationNotes: '',
+              }, verificationConfig);
+              
+              console.log(`   ✅ Number verification completed for card ${cardId}`);
+            } catch (verifyError: any) {
+              console.error(`   ❌ Error in number verification:`, verifyError);
+              console.error(`   ❌ Error message: ${verifyError.message}`);
+              console.error(`   ❌ Error stack: ${verifyError.stack}`);
+            }
+          })();
+        } else {
+          console.log(`   ℹ️  Number verification is disabled (EDITOR_NUMBER_VERIFICATION_ENABLED not set to 'true')`);
+        }
       } else {
         console.warn(`   ⚠️  TRELLO_LIST_ID_SUBMITTED not set - card not moved to Submitted`);
       }
