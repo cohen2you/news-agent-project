@@ -556,7 +556,7 @@ app.post("/approve", async (req, res) => {
     const newsArticles = currentState.values.newsArticles || [];
     
     // If an article index was selected, use that specific article
-    let selectedArticle = null;
+    let selectedArticle: any = null;
     if (selectedArticleIndex !== undefined && selectedArticleIndex !== null && 
         newsArticles[selectedArticleIndex]) {
       selectedArticle = newsArticles[selectedArticleIndex];
