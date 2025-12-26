@@ -243,29 +243,39 @@ function formatAnalystStory(
   // Normalize line breaks
   let formatted = storyText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   
-  // Fix Price Action line - look for malformed patterns like "PRICE shares were up..."
+  // Fix Price Action line FIRST (before HTML formatting) - look for malformed patterns like "PRICE shares were up..."
   // The API may return "Price Action: PRICE shares were up 0.00% at $0.00..."
   // We need to replace "PRICE" with the actual ticker and format properly
+  // This works for both plain text and HTML (the pattern matches text content even if wrapped in HTML tags)
   if (ticker) {
-    // Match the entire Price Action line with "PRICE" placeholder
+    // Match the entire Price Action line with "PRICE" placeholder (works in both plain text and HTML)
     // Pattern: "Price Action:" (optional colon, optional space) + "PRICE" + rest of line
-    const priceActionPattern = /(Price Action:?\s*)PRICE\s+(shares\s+were\s+(up|down|flat)[^.\n]*(?:at\s+\$[\d.]+)?[^.\n]*\.?)/gi;
+    // Handle both plain text and HTML-wrapped text
+    const priceActionPatterns = [
+      // Plain text or HTML content: "Price Action: PRICE shares were..."
+      /(Price Action:?\s*)PRICE\s+(shares\s+were\s+(up|down|flat)[^<\n]*(?:at\s+\$[\d.]+)?[^<\n]*\.?)/gi,
+      // HTML tags might wrap it: "<p>Price Action: PRICE shares were...</p>"
+      /(<[^>]*>)?\s*(Price Action:?\s*)PRICE\s+(shares\s+were\s+(up|down|flat)[^<\n]*(?:at\s+\$[\d.]+)?[^<\n]*\.?)/gi,
+      // Just "PRICE shares" without "Price Action:" prefix
+      /PRICE\s+shares\s+were\s+(up|down|flat)/gi,
+    ];
     
-    formatted = formatted.replace(priceActionPattern, (match, prefix, restOfLine) => {
-      // Extract direction (up/down/flat) and the rest of the price action text
-      const directionMatch = restOfLine.match(/(up|down|flat)/i);
-      const direction = directionMatch ? directionMatch[0] : 'up';
-      
+    // Apply first pattern (most common case)
+    formatted = formatted.replace(priceActionPatterns[0], (match, prefix, restOfLine) => {
       // Build proper Price Action line: "{TICKER} Price Action: shares were {direction}..."
-      // Remove any duplicate "shares" if present
-      const cleanedRest = restOfLine.replace(/^shares\s+/, '');
-      let priceActionLine = `${ticker} Price Action: ${cleanedRest}`;
-      
-      return priceActionLine;
+      const cleanedRest = restOfLine.trim();
+      return `${prefix.trim()}${ticker} ${cleanedRest}`;
     });
     
-    // Also handle case where it's just "PRICE shares" without "Price Action:" prefix
-    formatted = formatted.replace(/PRICE\s+shares\s+were\s+(up|down|flat)/gi, (match, direction) => {
+    // Apply second pattern (HTML-wrapped)
+    formatted = formatted.replace(priceActionPatterns[1], (match, htmlTag, prefix, restOfLine) => {
+      const cleanedRest = restOfLine.trim();
+      const tag = htmlTag || '';
+      return `${tag}${prefix.trim()}${ticker} ${cleanedRest}`;
+    });
+    
+    // Apply third pattern (just "PRICE shares" without prefix)
+    formatted = formatted.replace(priceActionPatterns[2], (match, direction) => {
       return `${ticker} Price Action: shares were ${direction}`;
     });
   }
