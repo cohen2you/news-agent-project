@@ -263,15 +263,16 @@ function formatAnalystStory(
     // Apply first pattern (most common case)
     formatted = formatted.replace(priceActionPatterns[0], (match, prefix, restOfLine) => {
       // Build proper Price Action line: "{TICKER} Price Action: shares were {direction}..."
+      // Replace "Price Action: PRICE" with "{TICKER} Price Action:"
       const cleanedRest = restOfLine.trim();
-      return `${prefix.trim()}${ticker} ${cleanedRest}`;
+      return `${ticker} Price Action: ${cleanedRest}`;
     });
     
     // Apply second pattern (HTML-wrapped)
     formatted = formatted.replace(priceActionPatterns[1], (match, htmlTag, prefix, restOfLine) => {
       const cleanedRest = restOfLine.trim();
       const tag = htmlTag || '';
-      return `${tag}${prefix.trim()}${ticker} ${cleanedRest}`;
+      return `${tag}${ticker} Price Action: ${cleanedRest}`;
     });
     
     // Apply third pattern (just "PRICE shares" without prefix)
