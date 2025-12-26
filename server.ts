@@ -2230,10 +2230,22 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
         console.log(`   🔍 Extracting URL from card description (length: ${cardData.desc?.length || 0})...`);
         
         // Pattern 1: **Source URL:** format (for news ingestion cards)
-        const sourceUrlMatch = (cardData.desc || '').match(/\*\*Source URL:\*\*\s*(https?:\/\/[^\s\n]+)/i);
+        // Handles both same-line and next-line URLs
+        const sourceUrlPattern = /\*\*Source URL:\*\*\s*\n?\s*(https?:\/\/[^\s\n]+)/i;
+        const sourceUrlMatch = (cardData.desc || '').match(sourceUrlPattern);
         if (sourceUrlMatch && !isInternalUrl(sourceUrlMatch[1])) {
           cardDescriptionUrl = sourceUrlMatch[1].trim();
           console.log(`   ✅ Found URL in Source URL format: ${cardDescriptionUrl}`);
+        }
+        
+        // Pattern 1b: **Source URL:** with URL on a separate line (more flexible)
+        if (!cardDescriptionUrl) {
+          const sourceUrlMultilinePattern = /\*\*Source URL:\*\*\s*\n\s*(https?:\/\/[^\s\n]+)/i;
+          const sourceUrlMultilineMatch = (cardData.desc || '').match(sourceUrlMultilinePattern);
+          if (sourceUrlMultilineMatch && !isInternalUrl(sourceUrlMultilineMatch[1])) {
+            cardDescriptionUrl = sourceUrlMultilineMatch[1].trim();
+            console.log(`   ✅ Found URL in Source URL format (multiline): ${cardDescriptionUrl}`);
+          }
         }
         
         // Pattern 2: Markdown links [text](url) - prioritize Benzinga URLs, but accept any if no Benzinga found
