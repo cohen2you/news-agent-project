@@ -4,6 +4,8 @@
  * 
  * Uses Puppeteer (headless browser) to simulate a real user and follow Google's redirects.
  * This is more reliable than trying to decode the API calls directly.
+ * 
+ * Optimized for Render deployment with specific Chrome path and arguments.
  */
 
 import puppeteer from 'puppeteer';
@@ -27,28 +29,23 @@ export async function decodeGoogleNewsUrl(sourceUrl: string): Promise<string> {
       try {
         console.log(`   🕵️‍♀️ Puppeteer decoding: ${sourceUrl.substring(0, 80)}...`);
         
-        // Configure executable path for Render (if using Puppeteer buildpack)
-        // On Render, Chrome is installed system-wide by the buildpack
-        const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || 
-                               process.env.CHROME_BIN ||
-                               undefined; // Let Puppeteer use its default if not set
-        
         const browser = await puppeteer.launch({
           headless: true,
-          executablePath: executablePath, // Use system Chrome if available
+          // [CRITICAL] Render-specific arguments
           args: [
             '--no-sandbox', 
             '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage', // Important for Render/Docker environments
-            '--single-process', // Helps with resource limits
-            '--disable-gpu', // Disable GPU for headless
-            '--disable-software-rasterizer'
-          ]
+            '--disable-dev-shm-usage',
+            '--single-process',
+            '--no-zygote'
+          ],
+          // [CRITICAL] Tell Puppeteer to use the Chrome installed by the Buildpack
+          executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome-stable'
         });
 
         const page = await browser.newPage();
         
-        // Block images/css to save bandwidth and speed up
+        // Block images/fonts to speed it up
         await page.setRequestInterception(true);
         page.on('request', (req) => {
           if (['image', 'stylesheet', 'font'].includes(req.resourceType())) {
@@ -58,10 +55,8 @@ export async function decodeGoogleNewsUrl(sourceUrl: string): Promise<string> {
           }
         });
 
-        // Go to the URL and wait for navigation to complete
         await page.goto(sourceUrl, { waitUntil: 'domcontentloaded' });
         
-        // Wait a moment for the JS redirect to fire (Google is usually fast)
         try {
           await page.waitForNavigation({ timeout: 5000 }); 
         } catch (e) {
@@ -71,9 +66,8 @@ export async function decodeGoogleNewsUrl(sourceUrl: string): Promise<string> {
         const finalUrl = page.url();
         await browser.close();
 
-        // If it failed to redirect, return original (caller should check this)
         if (finalUrl.includes('news.google.com')) {
-          console.warn(`   ⚠️  Failed to resolve redirect for: ${sourceUrl.substring(0, 80)}...`);
+          console.warn(`   ⚠️  Failed to resolve redirect.`);
           return sourceUrl; 
         }
 
