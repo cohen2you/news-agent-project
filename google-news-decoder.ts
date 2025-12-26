@@ -2,11 +2,11 @@
  * Google News URL Decoder
  * Decodes Google News Base64-encoded article URLs to get the real source URL
  * 
- * Google News changed their link structure in July 2024. They now use Base64-encoded
- * URLs that require calling Google's internal Batch Execute API to decode.
+ * Uses Puppeteer (headless browser) to simulate a real user and follow Google's redirects.
+ * This is more reliable than trying to decode the API calls directly.
  */
 
-import axios from 'axios';
+import puppeteer from 'puppeteer';
 
 /**
  * Decode Google News URL to get the original source URL
@@ -21,86 +21,67 @@ export async function decodeGoogleNewsUrl(sourceUrl: string): Promise<string> {
 
   try {
     const url = new URL(sourceUrl);
-    const path = url.pathname.split('/');
+    
+    // Only decode if it's a Google News link
+    if (url.hostname.includes('news.google.com')) {
+      try {
+        console.log(`   🕵️‍♀️ Puppeteer decoding: ${sourceUrl.substring(0, 80)}...`);
+        
+        const browser = await puppeteer.launch({
+          headless: true,
+          args: [
+            '--no-sandbox', 
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage', // Important for Render/Docker environments
+            '--single-process' // Helps with resource limits
+          ]
+        });
 
-    // Check if it's a Google News article URL
-    // Format: news.google.com/rss/articles/BASE64_ID
-    if (url.hostname === 'news.google.com' && path.length > 1 && path[path.length - 2] === 'articles') {
-      const base64Id = path[path.length - 1];
-      console.log(`   🔍 Detected Google News article ID: ${base64Id.substring(0, 30)}...`);
-      
-      // Use Google's Batch Execute API to resolve this
-      return await fetchDecodedBatchExecute(base64Id);
-    } else {
-      // Not a Google News article URL, return as-is
-      return sourceUrl;
+        const page = await browser.newPage();
+        
+        // Block images/css to save bandwidth and speed up
+        await page.setRequestInterception(true);
+        page.on('request', (req) => {
+          if (['image', 'stylesheet', 'font'].includes(req.resourceType())) {
+            req.abort();
+          } else {
+            req.continue();
+          }
+        });
+
+        // Go to the URL and wait for navigation to complete
+        await page.goto(sourceUrl, { waitUntil: 'domcontentloaded' });
+        
+        // Wait a moment for the JS redirect to fire (Google is usually fast)
+        try {
+          await page.waitForNavigation({ timeout: 5000 }); 
+        } catch (e) {
+          // Sometimes it redirects instantly before we wait, which is fine
+        }
+
+        const finalUrl = page.url();
+        await browser.close();
+
+        // If it failed to redirect, return original (caller should check this)
+        if (finalUrl.includes('news.google.com')) {
+          console.warn(`   ⚠️  Failed to resolve redirect for: ${sourceUrl.substring(0, 80)}...`);
+          return sourceUrl; 
+        }
+
+        console.log(`   ✅ Resolved to: ${finalUrl.substring(0, 100)}...`);
+        return finalUrl;
+
+      } catch (error: any) {
+        console.error(`   ❌ Puppeteer Error: ${error.message}`);
+        return sourceUrl;
+      }
     }
+    
+    // Not a Google News URL, return as-is
+    return sourceUrl;
   } catch (error: any) {
     // If URL parsing fails, return original
     console.log(`   ⚠️  Could not parse URL (${error.message}), using original`);
     return sourceUrl;
   }
 }
-
-/**
- * Fetch decoded URL using Google's Batch Execute API
- * This mimics the internal API call that Google's frontend uses
- */
-async function fetchDecodedBatchExecute(base64Id: string): Promise<string> {
-  // This is the specific RPC payload Google expects
-  const payload = [
-    ['Fbv4je', `["garturlreq",[["en-US","US",["FINANCE_TOP_INDICES","WEB_TEST_1_0_0"],null,null,1,1,"US:en",null,180,null,null,null,null,null,0,null,null,[1608992183,723341000]],"en-US","US",1,[2,3,4,8],1,0,"655000234",0,0,null,0],"${base64Id}"]`, null, 'generic']
-  ];
-
-  const body = 'f.req=' + encodeURIComponent(JSON.stringify([payload]));
-
-  try {
-    const response = await axios.post(
-      'https://news.google.com/_/DotsSplashUi/data/batchexecute?rpcids=Fbv4je',
-      body,
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-          'Referer': 'https://news.google.com/'
-        },
-        timeout: 10000 // 10 second timeout
-      }
-    );
-
-    // The response is a messy string; we need to parse it manually
-    const responseText = response.data;
-    
-    // Look for the "garturlres" key in the response
-    const header = '[\\"garturlres\\",\\"';
-    const footer = '\\",';
-
-    if (!responseText.includes(header)) {
-      // Fallback: If API fails, return the original Google link
-      console.log(`   ⚠️  Could not find decoded URL in API response, using original Google URL`);
-      return `https://news.google.com/rss/articles/${base64Id}`;
-    }
-
-    const start = responseText.indexOf(header) + header.length;
-    const end = responseText.indexOf(footer, start);
-    
-    if (start <= header.length || end <= start) {
-      console.log(`   ⚠️  Could not parse decoded URL from API response, using original Google URL`);
-      return `https://news.google.com/rss/articles/${base64Id}`;
-    }
-    
-    const decodedUrl = responseText.substring(start, end);
-    
-    // Clean up the URL (decode escape sequences)
-    const cleanUrl = decodedUrl.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
-    
-    console.log(`   ✅ Decoded to: ${cleanUrl.substring(0, 100)}...`);
-    return cleanUrl;
-
-  } catch (error: any) {
-    console.error(`   ❌ Error decoding Google News URL: ${error.message}`);
-    // Return original Google URL if decoding fails
-    return `https://news.google.com/rss/articles/${base64Id}`;
-  }
-}
-

@@ -112,10 +112,19 @@ export async function runNewsCycle(): Promise<void> {
         }
         
         // Decode Google News Base64-encoded URL to get the real source URL
-        // This uses Google's internal Batch Execute API to decode the URL
+        // This uses Puppeteer (headless browser) to follow Google's redirects
         const articleUrl = await decodeGoogleNewsUrl(googleUrl);
         
-        // Check if already processed (use original URL for deduplication)
+        // Safety check: Skip if URL decoding failed (still contains news.google.com)
+        // This prevents the AI from scraping Google's redirect/consent page and hallucinating stories
+        if (articleUrl.includes('news.google.com')) {
+          console.log(`   🚫 Skipping card: Could not resolve source URL (decoding failed)`);
+          console.log(`      Original URL: ${googleUrl.substring(0, 80)}...`);
+          totalSkipped++;
+          continue; // Skip this item entirely!
+        }
+        
+        // Check if already processed (use decoded URL for deduplication)
         if (isAlreadyProcessed(articleUrl)) {
           console.log(`   ⏭️  Already processed: "${title.substring(0, 50)}..."`);
           totalSkipped++;
