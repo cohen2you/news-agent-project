@@ -225,6 +225,137 @@ export async function scrapeAnalystNote(
 }
 
 /**
+ * Format analyst story: fix Price Action line and add Also Read/Read Next links
+ * Similar to formatWGOOutput but tailored for analyst stories
+ */
+function formatAnalystStory(
+  storyText: string,
+  extractedData: ExtractedData,
+  originalNote?: AnalystNoteData,
+  relatedArticles?: any[]
+): string {
+  if (!storyText) return '';
+  
+  // Extract ticker - prioritize extractedData, then originalNote
+  const ticker = extractedData.ticker || originalNote?.ticker || '';
+  const companyName = extractedData.companyName || '';
+  
+  // Normalize line breaks
+  let formatted = storyText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  
+  // Fix Price Action line - look for malformed patterns like "PRICE shares were up..."
+  // The API may return "Price Action: PRICE shares were up 0.00% at $0.00..."
+  // We need to replace "PRICE" with the actual ticker and format properly
+  if (ticker) {
+    // Match the entire Price Action line with "PRICE" placeholder
+    // Pattern: "Price Action:" (optional colon, optional space) + "PRICE" + rest of line
+    const priceActionPattern = /(Price Action:?\s*)PRICE\s+(shares\s+were\s+(up|down|flat)[^.\n]*(?:at\s+\$[\d.]+)?[^.\n]*\.?)/gi;
+    
+    formatted = formatted.replace(priceActionPattern, (match, prefix, restOfLine) => {
+      // Extract direction (up/down/flat) and the rest of the price action text
+      const directionMatch = restOfLine.match(/(up|down|flat)/i);
+      const direction = directionMatch ? directionMatch[0] : 'up';
+      
+      // Build proper Price Action line: "{TICKER} Price Action: shares were {direction}..."
+      // Remove any duplicate "shares" if present
+      const cleanedRest = restOfLine.replace(/^shares\s+/, '');
+      let priceActionLine = `${ticker} Price Action: ${cleanedRest}`;
+      
+      return priceActionLine;
+    });
+    
+    // Also handle case where it's just "PRICE shares" without "Price Action:" prefix
+    formatted = formatted.replace(/PRICE\s+shares\s+were\s+(up|down|flat)/gi, (match, direction) => {
+      return `${ticker} Price Action: shares were ${direction}`;
+    });
+  }
+  
+  // Check if story already has HTML tags (already formatted)
+  const hasHtmlTags = /<[a-z][\s\S]*>/i.test(formatted);
+  
+  if (!hasHtmlTags) {
+    // Convert markdown bold (**text**) to HTML bold
+    formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    
+    // Split into paragraphs
+    let paragraphs = formatted.split(/\n\n+/).filter(p => p.trim().length > 0);
+    
+    // If no double line breaks, try single line breaks
+    if (paragraphs.length === 1 && formatted.includes('\n')) {
+      paragraphs = formatted.split('\n').filter(p => p.trim().length > 0);
+    }
+    
+    // Wrap each paragraph in <p> tags
+    const formattedParagraphs = paragraphs.map((para, index) => {
+      para = para.trim();
+      if (!para) return '';
+      
+      const isFirst = index === 0;
+      const isLast = index === paragraphs.length - 1;
+      
+      // Remove bold from first paragraph
+      if (isFirst) {
+        para = para.replace(/<strong>(.+?)<\/strong>/g, '$1');
+      }
+      
+      // Format Price Action paragraph with special styling
+      if (/Price Action:/i.test(para)) {
+        return `<p style="margin: 1.5em 0 0.5em 0; font-weight: 600; font-size: 1.1em; color: #111827;">${para}</p>`;
+      }
+      
+      // Regular paragraph
+      return `<p style="margin: 1em 0; line-height: 1.7; color: #1f2937;">${para}</p>`;
+    }).filter(p => p.length > 0);
+    
+    formatted = formattedParagraphs.join('\n');
+  }
+  
+  // Add Also Read section if relatedArticles are provided
+  if (relatedArticles && Array.isArray(relatedArticles) && relatedArticles.length > 0) {
+    console.log(`   ✅ Adding Also Read section with ${relatedArticles.length} related articles`);
+    
+    const alsoReadSection = `\n\n<p style="margin: 2rem 0 0.5rem 0; font-weight: 600; font-size: 1.1em; color: #1f2937;">Also Read:</p>
+<ul style="list-style: none; padding: 0; margin: 0 0 2rem 0;">
+${relatedArticles.slice(0, 5).map((article: any) => {
+      const title = article.title || article.headline || 'Untitled Article';
+      const url = article.url || article.link || '#';
+      return `  <li style="margin-bottom: 0.5rem;">
+    <a href="${url}" style="color: #2563eb; text-decoration: none; font-weight: 500; font-size: 0.95rem;" target="_blank" rel="noopener noreferrer">${title}</a>
+  </li>`;
+    }).join('\n')}
+</ul>`;
+    
+    formatted += alsoReadSection;
+  }
+  
+  // Add Read Next section (similar to WGO) if we have additional articles
+  // For now, we'll use the same relatedArticles but show it as "Read Next" if there are more than 5
+  if (relatedArticles && Array.isArray(relatedArticles) && relatedArticles.length > 5) {
+    const readNextArticles = relatedArticles.slice(5, 10);
+    if (readNextArticles.length > 0) {
+      console.log(`   ✅ Adding Read Next section with ${readNextArticles.length} additional articles`);
+      
+      const readNextSection = `\n\n<div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #e5e7eb;">
+  <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: #1f2937;">Read Next</h3>
+  <ul style="list-style: none; padding: 0; margin: 0;">
+${readNextArticles.map((article: any) => {
+        const title = article.title || article.headline || 'Untitled Article';
+        const url = article.url || article.link || '#';
+        return `    <li style="margin-bottom: 0.75rem;">
+      <a href="${url}" style="color: #2563eb; text-decoration: none; font-weight: 500; font-size: 1rem;" target="_blank" rel="noopener noreferrer">${title}</a>
+    </li>`;
+      }).join('\n')}
+  </ul>
+</div>`;
+      
+      formatted += readNextSection;
+    }
+  }
+  
+  return formatted;
+}
+
+/**
  * Call the story generator tool to generate analyst note story
  * Uses /api/generate/analyst-article endpoint
  */
@@ -304,13 +435,18 @@ export async function generateAnalystStory(
 
       // The endpoint returns: { article: string, headline: string }
       // The headline is extracted from the first line of the article
+      let storyText = data.article || data.story || data.content || data.html || '';
+      
+      // Format the story: fix Price Action line, add Also Read/Read Next links
+      storyText = formatAnalystStory(storyText, extractedData, originalNote, data.alsoRead || data.relatedArticles);
+      
       return {
-        story: data.article || data.story || data.content || data.html || '',
+        story: storyText,
         title: data.headline || data.title || (extractedData.ticker 
           ? `${extractedData.firm || 'Analyst'} Updates ${extractedData.ticker}`
           : 'Analyst Note Story'),
         metadata: {
-          wordCount: data.wordCount || (data.article?.length || 0) / 5, // Rough estimate
+          wordCount: data.wordCount || (storyText.length || 0) / 5, // Rough estimate
           generatedAt: new Date().toISOString(),
           ...data.metadata,
         },
