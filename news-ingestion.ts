@@ -4,7 +4,6 @@
  */
 
 import Parser from 'rss-parser';
-import { decodeGoogleNewsUrl } from './google-news-decoder';
 import { determineTargetList } from './trello-list-router';
 import { TrelloService } from './trello-service';
 
@@ -16,28 +15,29 @@ const parser = new Parser({
 });
 
 // Define RSS Feeds for different content categories
+// Using Bing News RSS which provides clean, direct links (no decoding needed)
 const FEEDS = [
   // Hedge Funds & Institutional Investors
   {
-    url: 'https://news.google.com/rss/search?q="Hedge+Fund"+OR+"Bill+Ackman"+OR+"Ray+Dalio"+OR+"Ken+Griffin"+OR+"Citadel"+OR+"Pershing+Square"+OR+"13F"&hl=en-US&gl=US&ceid=US:en',
+    url: 'https://www.bing.com/news/search?q="Hedge+Fund"+OR+"Bill+Ackman"+OR+"Ray+Dalio"+OR+"Ken+Griffin"+OR+"Citadel"+OR+"Pershing+Square"+OR+"13F"&format=rss',
     name: 'Hedge Funds & Institutional'
   },
   
   // Commodities
   {
-    url: 'https://news.google.com/rss/search?q="Oil+Price"+OR+"Gold+Price"+OR+"Natural+Gas"+OR+"Commodities"+OR+"Crude+Oil"+OR+"WTI"+OR+"Brent"&hl=en-US&gl=US&ceid=US:en',
+    url: 'https://www.bing.com/news/search?q="Oil+Price"+OR+"Gold+Price"+OR+"Natural+Gas"+OR+"Commodities"+OR+"Crude+Oil"+OR+"WTI"+OR+"Brent"&format=rss',
     name: 'Commodities'
   },
   
   // Economy
   {
-    url: 'https://news.google.com/rss/search?q="Inflation"+OR+"CPI"+OR+"Fed+Rate"+OR+"GDP"+OR+"Recession"+OR+"FOMC"+OR+"Federal+Reserve"&hl=en-US&gl=US&ceid=US:en',
+    url: 'https://www.bing.com/news/search?q="Inflation"+OR+"CPI"+OR+"Fed+Rate"+OR+"GDP"+OR+"Recession"+OR+"FOMC"+OR+"Federal+Reserve"&format=rss',
     name: 'Economy'
   },
   
   // Broad Markets
   {
-    url: 'https://news.google.com/rss/search?q="Stock+Market"+OR+"S%26P+500"+OR+"Nasdaq"+OR+"Dow+Jones"+OR+"Wall+Street"&hl=en-US&gl=US&ceid=US:en',
+    url: 'https://www.bing.com/news/search?q="Stock+Market"+OR+"S%26P+500"+OR+"Nasdaq"+OR+"Dow+Jones"+OR+"Wall+Street"&format=rss',
     name: 'Markets'
   }
 ];
