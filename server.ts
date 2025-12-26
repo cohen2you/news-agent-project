@@ -6962,15 +6962,7 @@ async function startServer() {
                 console.log(`   ✅ prAutoScanActive set to: ${prAutoScanActive}`);
                 console.log(`   ✅ prAutoScanMode set to: ${prAutoScanMode}`);
                 
-                // Import runPRAutoScan function
-                const { runPRAutoScan } = await import("./server");
-                
-                // Calculate total tickers
-                const PR_AUTO_SCAN_TICKER_LISTS = [
-                  "FCEL,CGC,TLRY,ACB,MU,SNDL,APLD,IREN,ASTS,LCID,RKLB,HUT,BE,SBUX,SPCE,RIVN,BLNK,PLTR,PLUG,CIFR,CRWV,SOFI,SHOP,HIVE,BBAI,TSLA,HOOD,QS,OPEN,MRNA,ROKU,QBTS,BB,SOUN,SNAP,WKHS,AMZN,MSTR,XPEV,PINS,UAL,PTON,IONQ,GE,FUBO,META,AMD,XYZ,RIOT,$BTC",
-                  "NVDA,HUBS,MSFT,COIN,CHPT,NIO,CSCO,CLSK,NET,DKNG,QQQ,GOOG,GOOGL,QCOM,BA,ORCL,NVAX,CRWD,NKE,DIS,DAL,LUV,HD,SPY,GM,BIDU,CCL,F,BABA,ZM,BYND,UBER,RGTI,MARA,INTC,ARM,V,WFC,TTD,JPM,WMT,XOMA,NFLX,T,AAL,GILD,AMC,PFE,JNJ,AAPL",
-                  "DOCU,CRM,COST,ADBE,PYPL,GME,TGTX,CVX,DELL,HPQ,INO"
-                ];
+                // Calculate total tickers (PR_AUTO_SCAN_TICKER_LISTS is already defined at the top of the file)
                 const totalTickers = PR_AUTO_SCAN_TICKER_LISTS.reduce((sum, list) => sum + list.split(',').length, 0);
                 console.log(`   📊 Total tickers: ${totalTickers}`);
                 console.log(`   📋 Ticker lists: ${PR_AUTO_SCAN_TICKER_LISTS.length}`);
