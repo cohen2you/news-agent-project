@@ -128,18 +128,33 @@ export async function runNewsCycle(): Promise<void> {
         }
         
         try {
-          // Create Trello card
-          const cardDescription = `${articleUrl}\n\n${content.substring(0, 1000)}${content.length > 1000 ? '...' : ''}`;
+          // Create Trello card with full URL prominently displayed
+          const baseUrl = process.env.APP_URL || 'http://localhost:3001';
           
+          // Build card description with URL prominently displayed
+          let cardDescription = `**Source URL:** ${articleUrl}\n\n`;
+          if (content) {
+            cardDescription += `${content.substring(0, 1000)}${content.length > 1000 ? '...' : ''}\n\n`;
+          }
+          
+          // Create card first
           const card = await trello.createCard(
             targetListId,
             title,
             cardDescription
           );
           
+          // Now add Generate Article button with actual card ID
+          if (card && card.id) {
+            const generateArticleUrl = `${baseUrl}/trello/generate-article/${card.id}?selectedApp=story`;
+            cardDescription += `---\n\n**[Generate Article](${generateArticleUrl})**`;
+            await trello.updateCardDescription(card.id, cardDescription);
+          }
+          
           console.log(`   ✅ Created card: "${title.substring(0, 50)}..."`);
           console.log(`      → List ID: ${targetListId}`);
           console.log(`      → Card URL: ${card.url}`);
+          console.log(`      → Source URL: ${articleUrl}`);
           
           markAsProcessed(articleUrl);
           totalCreated++;

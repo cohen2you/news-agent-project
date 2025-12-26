@@ -2226,23 +2226,41 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
           return internalPatterns.some(pattern => pattern.test(url));
         };
         
-        // Try to find Benzinga URL in description - use comprehensive extraction
+        // Try to find URL in description - use comprehensive extraction
         console.log(`   🔍 Extracting URL from card description (length: ${cardData.desc?.length || 0})...`);
         
-        // Pattern 1: Markdown links [text](url) - prioritize Benzinga URLs
-        const allMarkdownLinks = [...(cardData.desc || '').matchAll(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g)];
-        const benzingaLink = allMarkdownLinks.find(match => 
-          match[2].includes('benzinga.com') && !isInternalUrl(match[2])
-        );
-        if (benzingaLink) {
-          cardDescriptionUrl = benzingaLink[2];
-          console.log(`   ✅ Found Benzinga URL in markdown link: ${cardDescriptionUrl}`);
-        } else {
-          // Pattern 2: Plain URLs (may include trailing punctuation or markdown artifacts)
+        // Pattern 1: **Source URL:** format (for news ingestion cards)
+        const sourceUrlMatch = (cardData.desc || '').match(/\*\*Source URL:\*\*\s*(https?:\/\/[^\s\n]+)/i);
+        if (sourceUrlMatch && !isInternalUrl(sourceUrlMatch[1])) {
+          cardDescriptionUrl = sourceUrlMatch[1].trim();
+          console.log(`   ✅ Found URL in Source URL format: ${cardDescriptionUrl}`);
+        }
+        
+        // Pattern 2: Markdown links [text](url) - prioritize Benzinga URLs, but accept any if no Benzinga found
+        if (!cardDescriptionUrl) {
+          const allMarkdownLinks = [...(cardData.desc || '').matchAll(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g)];
+          const benzingaLink = allMarkdownLinks.find(match => 
+            match[2].includes('benzinga.com') && !isInternalUrl(match[2])
+          );
+          if (benzingaLink) {
+            cardDescriptionUrl = benzingaLink[2];
+            console.log(`   ✅ Found Benzinga URL in markdown link: ${cardDescriptionUrl}`);
+          } else if (allMarkdownLinks.length > 0) {
+            // Use first non-internal markdown link if no Benzinga link found
+            const firstExternalLink = allMarkdownLinks.find(match => !isInternalUrl(match[2]));
+            if (firstExternalLink) {
+              cardDescriptionUrl = firstExternalLink[2];
+              console.log(`   ✅ Found URL in markdown link: ${cardDescriptionUrl}`);
+            }
+          }
+        }
+        
+        // Pattern 3: Plain URLs (may include trailing punctuation or markdown artifacts)
+        if (!cardDescriptionUrl) {
           const allPlainUrls = [...(cardData.desc || '').matchAll(/(https?:\/\/[^\s\n\)<>]+)/g)];
-          const benzingaUrls = allPlainUrls
+          const externalUrls = allPlainUrls
             .map(match => match[1])
-            .filter(url => url.includes('benzinga.com') && !isInternalUrl(url))
+            .filter(url => !isInternalUrl(url))
             .map(url => {
               // Clean up URL: remove trailing punctuation, markdown artifacts, and duplicate URLs
               let cleaned = url
@@ -2261,33 +2279,40 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
             })
             .filter(url => url.length > 0); // Remove empty URLs
           
+          // Prioritize Benzinga URLs, but accept any external URL if no Benzinga found
+          const benzingaUrls = externalUrls.filter(url => url.includes('benzinga.com'));
           if (benzingaUrls.length > 0) {
-            cardDescriptionUrl = benzingaUrls[0]; // Take first Benzinga URL found
+            cardDescriptionUrl = benzingaUrls[0];
             console.log(`   ✅ Found Benzinga URL in plain text: ${cardDescriptionUrl}`);
-          } else {
-            // Pattern 3: Any Benzinga URL pattern (fallback)
-            const benzingaPattern = /(https?:\/\/[^\s\n\)<>]*benzinga\.com[^\s\n\)<>]*)/i;
-            const fallbackMatch = (cardData.desc || '').match(benzingaPattern);
-            if (fallbackMatch && !isInternalUrl(fallbackMatch[1])) {
-              let cleaned = fallbackMatch[1]
-                .replace(/[.,;:!?]+$/, '')
-                .replace(/\]\(https?:\/\/.*$/, '')
-                .replace(/\)+$/, '')
-                .trim();
-              
-              const duplicateMatch = cleaned.match(/^([^\)]+?)(\]\(https?:\/\/.*)$/);
-              if (duplicateMatch) {
-                cleaned = duplicateMatch[1];
-              }
-              
-              cardDescriptionUrl = cleaned;
-              console.log(`   ✅ Found Benzinga URL via fallback pattern: ${cardDescriptionUrl}`);
+          } else if (externalUrls.length > 0) {
+            cardDescriptionUrl = externalUrls[0];
+            console.log(`   ✅ Found external URL in plain text: ${cardDescriptionUrl}`);
+          }
+        }
+        
+        // Pattern 4: Any Benzinga URL pattern (fallback for Benzinga-specific cards)
+        if (!cardDescriptionUrl) {
+          const benzingaPattern = /(https?:\/\/[^\s\n\)<>]*benzinga\.com[^\s\n\)<>]*)/i;
+          const fallbackMatch = (cardData.desc || '').match(benzingaPattern);
+          if (fallbackMatch && !isInternalUrl(fallbackMatch[1])) {
+            let cleaned = fallbackMatch[1]
+              .replace(/[.,;:!?]+$/, '')
+              .replace(/\]\(https?:\/\/.*$/, '')
+              .replace(/\)+$/, '')
+              .trim();
+            
+            const duplicateMatch = cleaned.match(/^([^\)]+?)(\]\(https?:\/\/.*)$/);
+            if (duplicateMatch) {
+              cleaned = duplicateMatch[1];
             }
+            
+            cardDescriptionUrl = cleaned;
+            console.log(`   ✅ Found Benzinga URL via fallback pattern: ${cardDescriptionUrl}`);
           }
         }
         
         if (!cardDescriptionUrl) {
-          console.warn(`   ⚠️  No Benzinga URL found in card description`);
+          console.warn(`   ⚠️  No URL found in card description`);
           console.warn(`   📋 Description preview: ${(cardData.desc || '').substring(0, 500)}`);
         }
         
