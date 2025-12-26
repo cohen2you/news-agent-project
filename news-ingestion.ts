@@ -24,29 +24,29 @@ const parser = new Parser({
 });
 
 // Define RSS Feeds for different content categories
-// Using Bing News RSS which provides clean, direct links (no decoding needed)
+// Using Google News RSS - users will manually click the link and paste the real source URL
 const FEEDS = [
   // Hedge Funds & Institutional Investors
   {
-    url: 'https://www.bing.com/news/search?q="Hedge+Fund"+OR+"Bill+Ackman"+OR+"Ray+Dalio"+OR+"Ken+Griffin"+OR+"Citadel"+OR+"Pershing+Square"+OR+"13F"&format=rss',
+    url: 'https://news.google.com/rss/search?q="Hedge+Fund"+OR+"Bill+Ackman"+OR+"Ray+Dalio"+OR+"Ken+Griffin"+OR+"Citadel"+OR+"Pershing+Square"+OR+"13F"&hl=en-US&gl=US&ceid=US:en',
     name: 'Hedge Funds & Institutional'
   },
   
   // Commodities
   {
-    url: 'https://www.bing.com/news/search?q="Oil+Price"+OR+"Gold+Price"+OR+"Natural+Gas"+OR+"Commodities"+OR+"Crude+Oil"+OR+"WTI"+OR+"Brent"&format=rss',
+    url: 'https://news.google.com/rss/search?q="Oil+Price"+OR+"Gold+Price"+OR+"Natural+Gas"+OR+"Commodities"+OR+"Crude+Oil"+OR+"WTI"+OR+"Brent"&hl=en-US&gl=US&ceid=US:en',
     name: 'Commodities'
   },
   
   // Economy
   {
-    url: 'https://www.bing.com/news/search?q="Inflation"+OR+"CPI"+OR+"Fed+Rate"+OR+"GDP"+OR+"Recession"+OR+"FOMC"+OR+"Federal+Reserve"&format=rss',
+    url: 'https://news.google.com/rss/search?q="Inflation"+OR+"CPI"+OR+"Fed+Rate"+OR+"GDP"+OR+"Recession"+OR+"FOMC"+OR+"Federal+Reserve"&hl=en-US&gl=US&ceid=US:en',
     name: 'Economy'
   },
   
   // Broad Markets
   {
-    url: 'https://www.bing.com/news/search?q="Stock+Market"+OR+"S%26P+500"+OR+"Nasdaq"+OR+"Dow+Jones"+OR+"Wall+Street"&format=rss',
+    url: 'https://news.google.com/rss/search?q="Stock+Market"+OR+"S%26P+500"+OR+"Nasdaq"+OR+"Dow+Jones"+OR+"Wall+Street"&hl=en-US&gl=US&ceid=US:en',
     name: 'Markets'
   }
 ];
