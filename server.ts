@@ -2125,16 +2125,6 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
     const { TrelloService } = await import("./trello-service");
     const trello = new TrelloService();
     
-    // Get card URL for redirect (before moving card)
-    let cardUrl = `https://trello.com/c/${cardId}`;
-    try {
-      const card = await trello.getCard(cardId);
-      cardUrl = card.url;
-      console.log(`   🔗 Card URL: ${cardUrl}`);
-    } catch (urlError: any) {
-      console.warn(`   ⚠️  Could not fetch card URL, using default: ${urlError.message}`);
-    }
-    
     // Move card to "In Progress" list immediately
     const inProgressListId = process.env.TRELLO_LIST_ID_IN_PROGRESS;
     let cardMoved = false;
@@ -2152,20 +2142,48 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
     }
     
     // Return immediately after moving card, process generation in background
-    // Redirect immediately back to Trello card using JavaScript (faster than meta refresh)
+    // Return minimal HTML that auto-closes the window
     const autoCloseHtml = `
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Redirecting...</title>
+    <title>Processing...</title>
     <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="2;url=about:blank">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: #f5f5f5;
+            color: #059669;
+        }
+        .message {
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
     <script>
-        // Immediate redirect - happens as soon as script loads
-        window.location.replace('${cardUrl}');
+        // Try to close the window immediately
+        window.onload = function() {
+            setTimeout(function() {
+                window.close();
+                // If window doesn't close (blocked by browser), show message
+                setTimeout(function() {
+                    document.body.innerHTML = '<div class="message"><h2>✅ Card moved to In Progress</h2><p>Article generation has started. You can close this window.</p></div>';
+                }, 500);
+            }, 100);
+        };
     </script>
 </head>
 <body>
-    <p>Redirecting...</p>
+    <div class="message">
+        <h2>Processing...</h2>
+        <p>Moving card to In Progress...</p>
+    </div>
 </body>
 </html>`;
     
@@ -3185,31 +3203,49 @@ app.get("/analyst-story/generate/:cardId", async (req, res) => {
       console.log(`   ⚠️  TRELLO_LIST_ID_IN_PROGRESS not set, skipping card move to In Progress`);
     }
     
-    // Get card URL for redirect (before moving card)
-    let cardUrl = `https://trello.com/c/${cardId}`;
-    try {
-      const card = await trello.getCard(cardId);
-      cardUrl = card.url;
-      console.log(`   🔗 Card URL: ${cardUrl}`);
-    } catch (urlError: any) {
-      console.warn(`   ⚠️  Could not fetch card URL, using default: ${urlError.message}`);
-    }
-    
     // Return immediately with auto-close page, process generation in background
-    // Redirect immediately back to Trello card using JavaScript (faster than meta refresh)
+    // Return minimal HTML that auto-closes the window
     const autoCloseHtml = `
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Redirecting...</title>
+    <title>Processing...</title>
     <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="2;url=about:blank">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: #f5f5f5;
+            color: #059669;
+        }
+        .message {
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
     <script>
-        // Immediate redirect - happens as soon as script loads
-        window.location.replace('${cardUrl}');
+        // Try to close the window immediately
+        window.onload = function() {
+            setTimeout(function() {
+                window.close();
+                // If window doesn't close (blocked by browser), show message
+                setTimeout(function() {
+                    document.body.innerHTML = '<div class="message"><h2>✅ Card moved to In Progress</h2><p>Analyst story generation has started. You can close this window.</p></div>';
+                }, 500);
+            }, 100);
+        };
     </script>
 </head>
 <body>
-    <p>Redirecting...</p>
+    <div class="message">
+        <h2>Processing...</h2>
+        <p>Moving card to In Progress...</p>
+    </div>
 </body>
 </html>`;
     res.send(autoCloseHtml);
