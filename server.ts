@@ -6947,24 +6947,72 @@ async function startServer() {
               const trelloListId = process.env.TRELLO_LIST_ID_PR || process.env.TRELLO_LIST_ID;
               
               if (prApiKey && trelloListId && process.env.TRELLO_API_KEY && process.env.TRELLO_TOKEN) {
-                // Start PR auto-scan in auto mode
-                const response = await fetch(`http://localhost:${PORT}/pr-auto-scan/start`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ mode: 'auto' })
-                });
+                // Directly start PR auto-scan instead of making HTTP request
+                console.log(`   ✅ All required environment variables present, starting PR auto-scan...`);
                 
-                if (response.ok) {
-                  console.log(`   ✅ PR auto-scan started successfully`);
-                } else {
-                  const error = await response.text();
-                  console.warn(`   ⚠️  Failed to auto-start PR auto-scan: ${error}`);
+                // Stop existing PR scan if running
+                if (prAutoScanInterval) {
+                  console.log(`   🔄 Stopping existing PR auto-scan interval...`);
+                  clearInterval(prAutoScanInterval);
+                  prAutoScanInterval = null;
                 }
+                
+                prAutoScanActive = true;
+                prAutoScanMode = 'auto';
+                console.log(`   ✅ prAutoScanActive set to: ${prAutoScanActive}`);
+                console.log(`   ✅ prAutoScanMode set to: ${prAutoScanMode}`);
+                
+                // Import runPRAutoScan function
+                const { runPRAutoScan } = await import("./server");
+                
+                // Calculate total tickers
+                const PR_AUTO_SCAN_TICKER_LISTS = [
+                  "FCEL,CGC,TLRY,ACB,MU,SNDL,APLD,IREN,ASTS,LCID,RKLB,HUT,BE,SBUX,SPCE,RIVN,BLNK,PLTR,PLUG,CIFR,CRWV,SOFI,SHOP,HIVE,BBAI,TSLA,HOOD,QS,OPEN,MRNA,ROKU,QBTS,BB,SOUN,SNAP,WKHS,AMZN,MSTR,XPEV,PINS,UAL,PTON,IONQ,GE,FUBO,META,AMD,XYZ,RIOT,$BTC",
+                  "NVDA,HUBS,MSFT,COIN,CHPT,NIO,CSCO,CLSK,NET,DKNG,QQQ,GOOG,GOOGL,QCOM,BA,ORCL,NVAX,CRWD,NKE,DIS,DAL,LUV,HD,SPY,GM,BIDU,CCL,F,BABA,ZM,BYND,UBER,RGTI,MARA,INTC,ARM,V,WFC,TTD,JPM,WMT,XOMA,NFLX,T,AAL,GILD,AMC,PFE,JNJ,AAPL",
+                  "DOCU,CRM,COST,ADBE,PYPL,GME,TGTX,CVX,DELL,HPQ,INO"
+                ];
+                const totalTickers = PR_AUTO_SCAN_TICKER_LISTS.reduce((sum, list) => sum + list.split(',').length, 0);
+                console.log(`   📊 Total tickers: ${totalTickers}`);
+                console.log(`   📋 Ticker lists: ${PR_AUTO_SCAN_TICKER_LISTS.length}`);
+                console.log(`   🎯 Mode: auto`);
+                console.log(`   📌 Output: Creating Trello cards in list: ${trelloListId}`);
+                console.log(`   ⏰ Check interval: 5 minutes`);
+                console.log(`   📥 Step 1: Running initial scan (fetching PRs from past 36 hours)...`);
+                
+                // Step 1: Run initial scan with PRs from past 36 hours
+                console.log(`   🔄 Calling runPRAutoScan(true)...`);
+                await runPRAutoScan(true); // true = initial load mode (36-hour filter)
+                console.log(`   ✅ Initial scan completed`);
+                
+                console.log(`   📥 Step 2: Setting up interval for regular scanning (every 5 minutes)...`);
+                
+                // Step 2: Set up interval to check every 5 minutes (with 48-hour filter)
+                prAutoScanInterval = setInterval(async () => {
+                  console.log(`\n⏰ PR AUTO-SCAN: Interval triggered (prAutoScanActive: ${prAutoScanActive})`);
+                  if (prAutoScanActive) {
+                    console.log(`   ✅ prAutoScanActive is true, running scan...`);
+                    try {
+                      await runPRAutoScan(false); // false = regular scan mode
+                    } catch (intervalError: any) {
+                      console.error(`   ❌ Error in PR auto-scan interval:`, intervalError);
+                      console.error(`   ❌ Error message:`, intervalError.message);
+                      console.error(`   ❌ Error stack:`, intervalError.stack);
+                    }
+                  } else {
+                    console.log(`   ⚠️  prAutoScanActive is false, skipping scan`);
+                  }
+                }, 5 * 60 * 1000); // 5 minutes
+                
+                console.log(`   ✅ PR auto-scan interval set up successfully`);
+                console.log(`   ✅ PR Auto-Scan is now RUNNING`);
               } else {
                 console.warn(`   ⚠️  PR auto-scan not auto-started: missing required environment variables`);
+                console.warn(`   ⚠️  Required: BENZINGA_PR_API_KEY, TRELLO_LIST_ID_PR (or TRELLO_LIST_ID), TRELLO_API_KEY, TRELLO_TOKEN`);
               }
             } catch (error: any) {
-              console.warn(`   ⚠️  Error auto-starting PR auto-scan:`, error.message);
+              console.error(`   ❌ Error auto-starting PR auto-scan:`, error);
+              console.error(`   ❌ Error message:`, error.message);
+              console.error(`   ❌ Error stack:`, error.stack);
             }
           }, 2000); // Wait 2 seconds for server to be fully ready
         }
