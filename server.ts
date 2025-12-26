@@ -1224,6 +1224,7 @@ app.post("/trello/webhook", async (req, res) => {
     // Trello sends different action types
     if (!webhook || !webhook.action) {
       console.log(`   ⚠️  Invalid webhook payload`);
+      console.log(`   📋 Webhook keys: ${Object.keys(webhook || {}).join(', ')}`);
       return res.status(400).json({ error: "Invalid webhook payload" });
     }
     
@@ -1231,19 +1232,27 @@ app.post("/trello/webhook", async (req, res) => {
     const actionType = action.type;
     
     console.log(`   📋 Action type: ${actionType}`);
+    console.log(`   📋 Action data keys: ${Object.keys(action.data || {}).join(', ')}`);
     
     // Handle commentCard actions (for WGO Control Card ticker search)
     if (actionType === 'commentCard') {
+      // Trello webhook structure for commentCard: action.data.card.id and action.data.text
       const cardId = action.data?.card?.id;
       const commentText = action.data?.text || '';
       
       console.log(`   💬 Comment card action detected`);
-      console.log(`   📋 Card ID: ${cardId}`);
+      console.log(`   📋 Full action.data structure:`, JSON.stringify(action.data, null, 2).substring(0, 500));
+      console.log(`   📋 Card ID: ${cardId || 'NOT FOUND'}`);
       console.log(`   💬 Comment: "${commentText.substring(0, 100)}"`);
       
       // Check if this is the WGO Control Card
       const controlCardId = process.env.TRELLO_WGO_CONTROL_CARD_ID;
-      if (controlCardId && cardId === controlCardId) {
+      console.log(`   🔍 WGO Control Card ID from env: ${controlCardId || 'NOT SET'}`);
+      console.log(`   🔍 Card ID match: ${cardId === controlCardId ? '✅ YES' : '❌ NO'}`);
+      
+      if (!controlCardId) {
+        console.log(`   ⚠️  TRELLO_WGO_CONTROL_CARD_ID not set in environment - skipping WGO comment handling`);
+      } else if (cardId && cardId === controlCardId) {
         console.log(`   ✅ Comment is on WGO Control Card - checking for ticker...`);
         
         // Extract ticker from comment (same pattern as polling monitor)
@@ -1306,7 +1315,14 @@ app.post("/trello/webhook", async (req, res) => {
           })();
         } else {
           console.log(`   ℹ️  Comment doesn't contain a valid ticker, skipping`);
+          console.log(`   💬 Comment text was: "${commentText}"`);
+          console.log(`   🔍 Ticker pattern match result: ${match ? 'MATCH' : 'NO MATCH'}`);
         }
+      } else if (cardId) {
+        console.log(`   ℹ️  Comment is on card ${cardId}, but it's not the WGO Control Card (expected ${controlCardId})`);
+      } else {
+        console.log(`   ⚠️  Could not extract card ID from webhook payload`);
+        console.log(`   📋 action.data structure:`, JSON.stringify(action.data, null, 2).substring(0, 500));
       }
       
       // Always return 200 to acknowledge webhook receipt
