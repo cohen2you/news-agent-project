@@ -3330,7 +3330,7 @@ app.get("/analyst-story/generate/:cardId", async (req, res) => {
           console.log(`   ✅ Updated card description with error message`);
           
           // Add comment with error
-          const errorComment = `❌ **Error generating analyst story**\n\n**Error:** ${error.message || 'Unknown error'}\n\n**Check:**\n1. Server logs for detailed error\n2. That ANALYST_BASE_URL is correct\n3. That the story generator API is running`;
+          const errorComment = `❌ **Error generating analyst story**\n\n**Error:** ${error.message || 'Unknown error'}\n\n**Check:**\n1. Server logs for detailed error\n2. That ARTICLE_GEN_APP_ANALYST_URL (or ANALYST_BASE_URL) is correct\n3. That the story generator API is running`;
           await trello.addComment(cardId, errorComment);
           console.log(`   ✅ Added error comment to Trello card`);
         } catch (updateError: any) {
