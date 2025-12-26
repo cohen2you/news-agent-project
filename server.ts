@@ -7056,10 +7056,11 @@ async function startServer() {
         // Start automatic button checker for manual cards
         startAutoButtonCheck();
         
-        // WGO Control Card comment monitoring: Try webhooks first (instant), fallback to polling
-        // Webhooks are preferred but may not always fire reliably, so we also enable polling as backup
-        // Polling runs every 30 seconds (less frequent than before) to reduce load while still providing reliability
-        startWGOControlCardMonitor(); // Enable polling as fallback/backup if webhooks don't fire
+        // WGO Control Card comment monitoring: Using webhooks (instant) - polling disabled
+        // Webhooks are now properly configured and provide instant responses
+        // Polling has been disabled to reduce unnecessary API calls
+        // Uncomment the line below to re-enable polling as backup if needed:
+        // startWGOControlCardMonitor();
         
         // Start email analyst agent polling if EMAIL_CHECK_INTERVAL is set
         const emailCheckInterval = process.env.EMAIL_CHECK_INTERVAL;
