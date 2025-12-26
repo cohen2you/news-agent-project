@@ -27,13 +27,22 @@ export async function decodeGoogleNewsUrl(sourceUrl: string): Promise<string> {
       try {
         console.log(`   🕵️‍♀️ Puppeteer decoding: ${sourceUrl.substring(0, 80)}...`);
         
+        // Configure executable path for Render (if using Puppeteer buildpack)
+        // On Render, Chrome is installed system-wide by the buildpack
+        const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || 
+                               process.env.CHROME_BIN ||
+                               undefined; // Let Puppeteer use its default if not set
+        
         const browser = await puppeteer.launch({
           headless: true,
+          executablePath: executablePath, // Use system Chrome if available
           args: [
             '--no-sandbox', 
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage', // Important for Render/Docker environments
-            '--single-process' // Helps with resource limits
+            '--single-process', // Helps with resource limits
+            '--disable-gpu', // Disable GPU for headless
+            '--disable-software-rasterizer'
           ]
         });
 
