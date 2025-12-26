@@ -1215,6 +1215,12 @@ The selected article generation app will determine the word count and specific f
 //
 // 3. See TRELLO_WEBHOOK_SETUP.md for detailed instructions
 //
+// Handle HEAD requests for webhook validation (Trello validates webhooks with HEAD before creating them)
+app.head("/trello/webhook", (req, res) => {
+  console.log(`\n🔔 [HEAD /trello/webhook] Trello webhook validation request`);
+  res.status(200).end();
+});
+
 app.post("/trello/webhook", async (req, res) => {
   console.log(`\n🔔 [POST /trello/webhook] Trello webhook received`);
   
