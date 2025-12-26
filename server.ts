@@ -1232,6 +1232,87 @@ app.post("/trello/webhook", async (req, res) => {
     
     console.log(`   📋 Action type: ${actionType}`);
     
+    // Handle commentCard actions (for WGO Control Card ticker search)
+    if (actionType === 'commentCard') {
+      const cardId = action.data?.card?.id;
+      const commentText = action.data?.text || '';
+      
+      console.log(`   💬 Comment card action detected`);
+      console.log(`   📋 Card ID: ${cardId}`);
+      console.log(`   💬 Comment: "${commentText.substring(0, 100)}"`);
+      
+      // Check if this is the WGO Control Card
+      const controlCardId = process.env.TRELLO_WGO_CONTROL_CARD_ID;
+      if (controlCardId && cardId === controlCardId) {
+        console.log(`   ✅ Comment is on WGO Control Card - checking for ticker...`);
+        
+        // Extract ticker from comment (same pattern as polling monitor)
+        const tickerPattern = /(?:search\s+)?([A-Z]{1,5})\b/i;
+        const match = commentText.match(tickerPattern);
+        
+        if (match && /^[A-Z]{1,5}$/.test(match[1].toUpperCase())) {
+          const ticker = match[1].toUpperCase();
+          console.log(`   ✅ Ticker detected: ${ticker}`);
+          
+          // Trigger WGO search in background (same logic as polling monitor)
+          (async () => {
+            try {
+              const { TrelloService } = await import("./trello-service");
+              const trello = new TrelloService();
+              
+              // Reply immediately that we're starting
+              await trello.addComment(controlCardId, `✅ Starting WGO search for **${ticker}**...`);
+              
+              // Trigger WGO search
+              const { wgoGraph } = await import("./wgo-agent");
+              const threadId = `wgo_comment_${Date.now()}`;
+              const config = { configurable: { thread_id: threadId } };
+              
+              console.log(`   🚀 Triggering WGO search for ${ticker}...`);
+              await wgoGraph.invoke({ topic: ticker }, config);
+              
+              const state = await wgoGraph.getState(config);
+              const newsArticles = state.values.newsArticles || [];
+              const pitch = state.values.pitch || '';
+              
+              // Reply with results
+              let replyText = `✅ WGO Search Complete for **${ticker}**\n\n`;
+              if (newsArticles.length > 0) {
+                replyText += `Found ${newsArticles.length} article(s):\n\n`;
+                newsArticles.slice(0, 5).forEach((article: any, index: number) => {
+                  const title = article.title || article.headline || 'Untitled';
+                  replyText += `${index + 1}. ${title}\n`;
+                });
+                if (newsArticles.length > 5) {
+                  replyText += `\n... and ${newsArticles.length - 5} more`;
+                }
+                replyText += `\n\nCheck the "WGO/WIIM Stories" list for the new card.`;
+              } else {
+                replyText += `No recent articles found for ${ticker}.`;
+              }
+              
+              await trello.addComment(controlCardId, replyText);
+              console.log(`   ✅ WGO search completed and replied to comment`);
+            } catch (error: any) {
+              console.error(`   ❌ Error processing WGO comment:`, error);
+              try {
+                const { TrelloService } = await import("./trello-service");
+                const trello = new TrelloService();
+                await trello.addComment(controlCardId, `❌ Error processing WGO search: ${error.message}`);
+              } catch (commentError) {
+                // Ignore comment errors
+              }
+            }
+          })();
+        } else {
+          console.log(`   ℹ️  Comment doesn't contain a valid ticker, skipping`);
+        }
+      }
+      
+      // Always return 200 to acknowledge webhook receipt
+      return res.status(200).json({ received: true });
+    }
+    
     // We're interested in card updates (updateCard, createCard)
     if (actionType === 'updateCard' || actionType === 'createCard') {
       const cardData = action.data?.card || action.data?.cardBefore || action.data?.cardAfter;
@@ -6953,9 +7034,10 @@ async function startServer() {
         // Start automatic button checker for manual cards
         startAutoButtonCheck();
         
-        // Start WGO control card comment monitor
-        // This polls the WGO Control Card every 10 seconds to check for new comments with tickers
-        startWGOControlCardMonitor();
+        // WGO Control Card comment monitoring is now handled via Trello webhooks
+        // The webhook handler detects commentCard actions on the WGO Control Card instantly
+        // No need for polling - webhooks are more efficient and responsive
+        // startWGOControlCardMonitor(); // Disabled - using webhooks instead
         
         // Start email analyst agent polling if EMAIL_CHECK_INTERVAL is set
         const emailCheckInterval = process.env.EMAIL_CHECK_INTERVAL;
