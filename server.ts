@@ -61,6 +61,20 @@ if (existsSync(envLocalPath)) {
     console.log(`✅ Found TRELLO_LIST_ID_WGO: ${process.env.TRELLO_LIST_ID_WGO}`);
   }
   
+  // Content-based routing lists
+  if (process.env.TRELLO_LIST_ID_MARKETS) {
+    console.log(`✅ Found TRELLO_LIST_ID_MARKETS: ${process.env.TRELLO_LIST_ID_MARKETS}`);
+  }
+  if (process.env.TRELLO_LIST_ID_ECONOMY) {
+    console.log(`✅ Found TRELLO_LIST_ID_ECONOMY: ${process.env.TRELLO_LIST_ID_ECONOMY}`);
+  }
+  if (process.env.TRELLO_LIST_ID_COMMODITIES) {
+    console.log(`✅ Found TRELLO_LIST_ID_COMMODITIES: ${process.env.TRELLO_LIST_ID_COMMODITIES}`);
+  }
+  if (process.env.TRELLO_LIST_ID_HEDGE_FUNDS) {
+    console.log(`✅ Found TRELLO_LIST_ID_HEDGE_FUNDS: ${process.env.TRELLO_LIST_ID_HEDGE_FUNDS}`);
+  }
+  
   if (process.env.TRELLO_LIST_ID_SUBMITTED) {
     console.log(`✅ Found TRELLO_LIST_ID_SUBMITTED: ${process.env.TRELLO_LIST_ID_SUBMITTED}`);
   } else {
@@ -4323,6 +4337,28 @@ app.post("/auto-scan/start", async (req, res) => {
   }
 });
 
+// News Ingestion Endpoint: Manually trigger news cycle
+app.post("/news-ingestion/run", async (req, res) => {
+  console.log("\n📡 [POST /news-ingestion/run] Manual news ingestion triggered");
+  
+  try {
+    const { runNewsCycle } = await import("./news-ingestion");
+    
+    // Run in background (don't await - return immediately)
+    runNewsCycle().catch((error: any) => {
+      console.error("❌ Error in news ingestion cycle:", error);
+    });
+    
+    res.json({
+      status: "started",
+      message: "News ingestion cycle started. Check logs for progress."
+    });
+  } catch (error: any) {
+    console.error("Error starting news ingestion:", error);
+    res.status(500).json({ error: error.message || "Failed to start news ingestion" });
+  }
+});
+
 // Endpoint: Stop auto-scan
 app.post("/auto-scan/stop", (req, res) => {
   console.log("\n⏸️  [POST /auto-scan/stop] Request received");
@@ -7157,6 +7193,39 @@ async function startServer() {
         // Polling has been disabled to reduce unnecessary API calls
         // Uncomment the line below to re-enable polling as backup if needed:
         // startWGOControlCardMonitor();
+        
+        // Start news ingestion service if enabled
+        const newsIngestionEnabled = process.env.NEWS_INGESTION_ENABLED === 'true';
+        const newsIngestionInterval = parseInt(process.env.NEWS_INGESTION_INTERVAL || '300000'); // Default 5 minutes (300000ms)
+        
+        if (newsIngestionEnabled) {
+          console.log(`\n📡 Starting News Ingestion Service...`);
+          console.log(`   Interval: ${newsIngestionInterval / 1000 / 60} minutes`);
+          
+          // Run immediately on startup (with small delay to let server fully start)
+          setTimeout(async () => {
+            try {
+              const { runNewsCycle } = await import("./news-ingestion");
+              await runNewsCycle();
+            } catch (error: any) {
+              console.error(`   ❌ Error in initial news cycle:`, error.message);
+            }
+          }, 10000); // Wait 10 seconds after server starts
+          
+          // Then run on interval
+          setInterval(async () => {
+            try {
+              const { runNewsCycle } = await import("./news-ingestion");
+              await runNewsCycle();
+            } catch (error: any) {
+              console.error(`   ❌ Error in news cycle:`, error.message);
+            }
+          }, newsIngestionInterval);
+          
+          console.log(`   ✅ News Ingestion Service started`);
+        } else {
+          console.log(`\nℹ️  News Ingestion Service disabled (set NEWS_INGESTION_ENABLED=true to enable)`);
+        }
         
         // Start email analyst agent polling if EMAIL_CHECK_INTERVAL is set
         const emailCheckInterval = process.env.EMAIL_CHECK_INTERVAL;
