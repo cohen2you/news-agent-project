@@ -6417,6 +6417,66 @@ async function runPRAutoScan(initialLoad: boolean = false) {
     
     console.log(`   📊 Summary: Fetched ${allPRs.length} PRs total`);
     
+    // Fallback: If no PRs found in time window, fetch 10 latest from past 7 days
+    if (allPRs.length === 0) {
+      console.log(`   ⚠️  No PRs found in time window, falling back to fetch 10 latest PRs from past 7 days...`);
+      
+      const fallbackPRs: any[] = [];
+      
+      for (let queryIndex = 0; queryIndex < PR_AUTO_SCAN_TICKER_LISTS.length; queryIndex++) {
+        const tickerList = PR_AUTO_SCAN_TICKER_LISTS[queryIndex];
+        try {
+          console.log(`   📥 Fallback Query ${queryIndex + 1}/3: Fetching PRs for ${tickerList.split(',').length} tickers (no time filter)...`);
+          
+          const url = `${BZ_NEWS_URL}?pageSize=100&displayOutput=full&token=${prApiKey}&tickers=${encodeURIComponent(tickerList)}&page=0&fields=headline,title,created,body,url,channels,teaser&accept=application/json&channels=Press Releases`;
+          
+          const response = await fetch(url, {
+            headers: { 
+              Accept: 'application/json' 
+            },
+          });
+
+          if (!response.ok) {
+            console.error(`   ❌ Benzinga API error for fallback query ${queryIndex + 1}: ${response.status} ${response.statusText}`);
+            continue;
+          }
+
+          const data = await response.json() as any;
+          
+          let prs: any[] = [];
+          if (data && typeof data === 'object') {
+            if (Array.isArray(data)) {
+              prs = data;
+            } else if (data.news && Array.isArray(data.news)) {
+              prs = data.news;
+            } else if (data.data && Array.isArray(data.data)) {
+              prs = data.data;
+            }
+          }
+          
+          // Filter to past 7 days only
+          const recentPRs = prs.filter(isWithin7Days);
+          console.log(`   ✅ Fallback Query ${queryIndex + 1}/3: Found ${recentPRs.length} PRs from past 7 days`);
+          fallbackPRs.push(...recentPRs);
+          
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (error) {
+          console.error(`   ⚠️  Error in fallback query ${queryIndex + 1}:`, error);
+        }
+      }
+      
+      // Sort by date (newest first) and take top 10
+      fallbackPRs.sort((a, b) => {
+        const dateA = a.created || 0;
+        const dateB = b.created || 0;
+        return dateB - dateA; // Most recent first
+      });
+      
+      const top10PRs = fallbackPRs.slice(0, 10);
+      console.log(`   ✅ Fallback: Selected top 10 PRs from ${fallbackPRs.length} PRs found in past 7 days`);
+      allPRs.push(...top10PRs);
+    }
+    
     if (initialLoad) {
       console.log(`   ✅ Found ${allPRs.length} total recent PRs (initial load)`);
       
