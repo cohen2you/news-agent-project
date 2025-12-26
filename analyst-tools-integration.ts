@@ -232,9 +232,11 @@ export async function generateAnalystStory(
   extractedData: ExtractedData,
   originalNote?: AnalystNoteData
 ): Promise<GeneratedStory> {
-  // Build URL - use ANALYST_BASE_URL if set, or default to localhost:3002
-  const baseUrl = process.env.ANALYST_BASE_URL || 'http://localhost:3002';
-  const generatorUrl = `${baseUrl}/api/generate/analyst-article`;
+  // Build URL - prefer ARTICLE_GEN_APP_ANALYST_URL (standardized pattern), fallback to ANALYST_BASE_URL (legacy)
+  // This matches the pattern used by WGO and STORY article generation
+  const generatorUrl = process.env.ARTICLE_GEN_APP_ANALYST_URL || 
+                       (process.env.ANALYST_BASE_URL ? `${process.env.ANALYST_BASE_URL}/api/generate/analyst-article` : null) ||
+                       'http://localhost:3002/api/generate/analyst-article';
 
   console.log(`📝 Calling story generator: ${generatorUrl}`);
 
@@ -323,9 +325,9 @@ export async function generateAnalystStory(
         throw new Error(`Story generator API call timed out after ${timeoutMs / 1000} seconds. The API may be slow or unresponsive.`);
       } else if (fetchError.message?.includes('ECONNREFUSED') || fetchError.message?.includes('ENOTFOUND')) {
         console.error(`   ❌ Story generator API is not accessible: ${fetchError.message}`);
-        console.error(`   💡 Check that ANALYST_BASE_URL is correct: ${baseUrl}`);
-        console.error(`   💡 Make sure the wiim-project-v2 server is running on that URL`);
-        throw new Error(`Story generator API is not accessible at ${baseUrl}. Make sure the server is running.`);
+        console.error(`   💡 Check that ARTICLE_GEN_APP_ANALYST_URL (or ANALYST_BASE_URL) is correct: ${generatorUrl}`);
+        console.error(`   💡 Make sure the analyst story generator server is running on that URL`);
+        throw new Error(`Story generator API is not accessible at ${generatorUrl}. Make sure the server is running.`);
       } else {
         console.error(`   ❌ Error calling story generator (after ${elapsed}s):`, fetchError);
         throw fetchError;

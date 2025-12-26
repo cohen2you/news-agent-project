@@ -703,23 +703,29 @@ app.get("/health", (req, res) => {
 // Test endpoint to verify analyst story generation endpoint is accessible
 app.get("/analyst-story/test", (req, res) => {
   const appUrl = process.env.APP_URL || 'http://localhost:3001';
+  // Prefer standardized ARTICLE_GEN_APP_ANALYST_URL, fallback to legacy ANALYST_BASE_URL
+  const analystUrl = process.env.ARTICLE_GEN_APP_ANALYST_URL || 
+                     (process.env.ANALYST_BASE_URL ? `${process.env.ANALYST_BASE_URL}/api/generate/analyst-article` : null) ||
+                     'http://localhost:3002/api/generate/analyst-article';
   const analystBaseUrl = process.env.ANALYST_BASE_URL || 'http://localhost:3002';
   res.json({
     status: "ok",
     message: "Analyst story endpoint is accessible",
     appUrl: appUrl,
-    analystBaseUrl: analystBaseUrl,
+    analystUrl: analystUrl,
+    analystBaseUrl: analystBaseUrl, // Legacy, for backwards compatibility
     warnings: [
       appUrl.includes('localhost') ? "⚠️ APP_URL uses localhost - Trello web app cannot access this. Use a public URL or ngrok tunnel." : "✅ APP_URL is publicly accessible",
-      analystBaseUrl.includes('localhost') ? "⚠️ ANALYST_BASE_URL uses localhost - make sure the wiim-project-v2 server is running on that port." : "✅ ANALYST_BASE_URL is configured"
+      analystUrl.includes('localhost') ? "⚠️ Analyst story generator URL uses localhost - make sure the server is running." : "✅ Analyst story generator URL is configured"
     ],
     endpoints: {
       generate: `${appUrl}/analyst-story/generate/:cardId`,
       test: `${appUrl}/analyst-story/test`,
-      storyGenerator: `${analystBaseUrl}/api/generate/analyst-article`
+      storyGenerator: analystUrl
     },
     environment: {
-      ANALYST_BASE_URL: process.env.ANALYST_BASE_URL || 'NOT SET (defaults to http://localhost:3002)',
+      ARTICLE_GEN_APP_ANALYST_URL: process.env.ARTICLE_GEN_APP_ANALYST_URL || 'NOT SET (preferred)',
+      ANALYST_BASE_URL: process.env.ANALYST_BASE_URL || 'NOT SET (legacy, fallback)',
       ANALYST_AI_PROVIDER: process.env.ANALYST_AI_PROVIDER || 'NOT SET',
       TRELLO_LIST_ID_IN_PROGRESS: process.env.TRELLO_LIST_ID_IN_PROGRESS || 'NOT SET',
       TRELLO_LIST_ID_SUBMITTED: process.env.TRELLO_LIST_ID_SUBMITTED || 'NOT SET'
@@ -3060,7 +3066,8 @@ app.get("/analyst-story/generate/:cardId", async (req, res) => {
         console.log(`   📋 Thread ID: ${threadId}`);
         console.log(`   ⏱️  Start time: ${new Date().toISOString()}`);
         console.log(`   🔍 Checking environment variables...`);
-        console.log(`      - ANALYST_BASE_URL: ${process.env.ANALYST_BASE_URL || 'NOT SET (defaults to http://localhost:3002)'}`);
+        console.log(`      - ARTICLE_GEN_APP_ANALYST_URL: ${process.env.ARTICLE_GEN_APP_ANALYST_URL || 'NOT SET (preferred)'}`);
+        console.log(`      - ANALYST_BASE_URL: ${process.env.ANALYST_BASE_URL || 'NOT SET (legacy fallback)'}`);
         console.log(`      - ANALYST_AI_PROVIDER: ${process.env.ANALYST_AI_PROVIDER || 'NOT SET'}`);
         
         // Run the analyst story generation agent
@@ -3315,7 +3322,9 @@ app.get("/analyst-story/generate/:cardId", async (req, res) => {
           updatedDesc = updatedDesc.replace(/\n\n---\n\n## ❌ Error Generating Story[\s\S]*?$/m, '');
           
           // Add new error message
-          updatedDesc += `\n\n---\n\n## ❌ Error Generating Story\n\n**Error:** ${error.message || 'Unknown error'}\n\n**Time:** ${new Date().toLocaleString()}\n\n**Possible causes:**\n- Card data could not be extracted from Trello\n- Story generator API (${process.env.ANALYST_BASE_URL || 'http://localhost:3002'}) is not accessible\n- API returned an error\n- Check server logs for detailed error information\n`;
+          const analystUrl = process.env.ARTICLE_GEN_APP_ANALYST_URL || 
+                             (process.env.ANALYST_BASE_URL ? `${process.env.ANALYST_BASE_URL}/api/generate/analyst-article` : 'http://localhost:3002/api/generate/analyst-article');
+          updatedDesc += `\n\n---\n\n## ❌ Error Generating Story\n\n**Error:** ${error.message || 'Unknown error'}\n\n**Time:** ${new Date().toLocaleString()}\n\n**Possible causes:**\n- Card data could not be extracted from Trello\n- Story generator API (${analystUrl}) is not accessible\n- API returned an error\n- Check server logs for detailed error information\n`;
           
           await trello.updateCardDescription(cardId, updatedDesc);
           console.log(`   ✅ Updated card description with error message`);
