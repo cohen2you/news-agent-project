@@ -2358,35 +2358,17 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
             }
           }
           
-          // If API fetch failed or returned nothing, try scraping the URL
-          if (!sourceData) {
-            console.log(`   🌐 API fetch failed - attempting to scrape article from URL...`);
-            try {
-              const { scrapeBenzingaArticleByUrl } = await import("./benzinga-api");
-              sourceData = await scrapeBenzingaArticleByUrl(cardDescriptionUrl!);
-              
-              if (sourceData) {
-                console.log(`   ✅ Successfully scraped article: ${sourceData.title}`);
-                // Extract ticker from card title if present and not in scraped data
-                const titleMatch = card.name.match(/^([A-Z]{1,5})\.\.\.\s+(.+)$/);
-                if (titleMatch && titleMatch[1]) {
-                  const cardTicker = titleMatch[1].toUpperCase();
-                  if (!sourceData.stocks || sourceData.stocks.length === 0) {
-                    sourceData.stocks = [cardTicker];
-                  }
-                }
-              }
-            } catch (scrapeError: any) {
-              console.warn(`   ⚠️  Scraping failed (${scrapeError.message}) - will create minimal source data`);
-            }
-          }
+          // Check for manually pasted article text in card description FIRST
+          // Pattern: **Article Text:** followed by text (can span multiple lines)
+          const articleTextPattern = /\*\*Article Text:\*\*\s*\n?\s*([\s\S]*?)(?=\n\n---|\n\n\*\*|$)/i;
+          const articleTextMatch = (cardData.desc || '').match(articleTextPattern);
+          const pastedArticleText = articleTextMatch ? articleTextMatch[1].trim() : null;
           
-          // If scraping also failed, create minimal sourceData from URL
-          if (!sourceData) {
-            console.log(`   📝 Creating minimal source data from URL (no API or scraped data available)`);
+          if (pastedArticleText && pastedArticleText.length > 50) {
+            console.log(`   ✅ Found manually pasted article text (${pastedArticleText.length} chars)`);
             const cardTitle = card.name.replace(/^[A-Z]{1,5}\.\.\.\s+/, ''); // Remove ticker prefix if present
             
-            // Extract ticker from card title if present (format: "TICKER... Title")
+            // Extract ticker from card title if present
             let ticker: string | null = null;
             const titleMatch = card.name.match(/^([A-Z]{1,5})\.\.\.\s+(.+)$/);
             if (titleMatch) {
@@ -2398,22 +2380,105 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
               title: cardTitle,
               headline: cardTitle,
               url: cardDescriptionUrl!,
-              body: '', // Will be populated from pitch/URL
-              teaser: '',
+              body: pastedArticleText, // Use pasted text as body
+              teaser: pastedArticleText.substring(0, 500),
+              content: pastedArticleText,
               created: Math.floor(Date.now() / 1000),
               updated: Math.floor(Date.now() / 1000),
               channels: [],
               stocks: ticker ? [ticker] : [],
               tags: [],
-              // Mark that this is URL-only data
-              _urlOnly: true
+              _manualText: true // Mark that this uses manually pasted text
             };
             
-            console.log(`   ✅ Created minimal source data from URL`);
+            console.log(`   ✅ Created source data from manually pasted article text`);
             console.log(`      Title: ${cardTitle}`);
             console.log(`      URL: ${cardDescriptionUrl}`);
+            console.log(`      Body length: ${pastedArticleText.length} chars`);
             if (ticker) {
               console.log(`      Ticker: ${ticker}`);
+            }
+          } else {
+            // If API fetch failed or returned nothing, try scraping the URL
+            if (!sourceData) {
+              console.log(`   🌐 API fetch failed - attempting to scrape article from URL...`);
+              try {
+                const { scrapeBenzingaArticleByUrl } = await import("./benzinga-api");
+                sourceData = await scrapeBenzingaArticleByUrl(cardDescriptionUrl!);
+                
+                if (sourceData) {
+                  console.log(`   ✅ Successfully scraped article: ${sourceData.title}`);
+                  // Extract ticker from card title if present and not in scraped data
+                  const titleMatch = card.name.match(/^([A-Z]{1,5})\.\.\.\s+(.+)$/);
+                  if (titleMatch && titleMatch[1]) {
+                    const cardTicker = titleMatch[1].toUpperCase();
+                    if (!sourceData.stocks || sourceData.stocks.length === 0) {
+                      sourceData.stocks = [cardTicker];
+                    }
+                  }
+                }
+              } catch (scrapeError: any) {
+                console.warn(`   ⚠️  Scraping failed (${scrapeError.message}) - will update card with manual text option`);
+                
+                // Scraping failed - update card to notify user and provide field for manual paste
+                try {
+                  let updatedDesc = cardData.desc || '';
+                  
+                  // Remove any existing scraping error messages to avoid duplicates
+                  updatedDesc = updatedDesc.replace(/\n\n---\n\n## ⚠️ Scraping Failed[\s\S]*?(?=\n\n---\n\n\*\*\[Generate Article\]|$)/, '');
+                  
+                  // Add scraping failure notification and manual text field
+                  updatedDesc += `\n\n---\n\n## ⚠️ Scraping Failed\n\n`;
+                  updatedDesc += `The article could not be automatically scraped from the URL.\n\n`;
+                  updatedDesc += `**To proceed, please:**\n`;
+                  updatedDesc += `1. Copy the full article text from the source URL\n`;
+                  updatedDesc += `2. Paste it in the "Article Text" field below\n`;
+                  updatedDesc += `3. Click "Generate Article" again\n\n`;
+                  updatedDesc += `**Article Text:**\n\n`;
+                  updatedDesc += `*(Paste the full article text here)*\n\n`;
+                  
+                  await trello.updateCardDescription(cardId, updatedDesc);
+                  console.log(`   ✅ Updated card with scraping failure notification and manual text field`);
+                } catch (updateError: any) {
+                  console.error(`   ❌ Failed to update card with scraping error:`, updateError.message);
+                }
+              }
+            }
+            
+            // If scraping also failed and no pasted text, create minimal sourceData from URL
+            if (!sourceData) {
+              console.log(`   📝 Creating minimal source data from URL (no API, scraping, or pasted text available)`);
+              const cardTitle = card.name.replace(/^[A-Z]{1,5}\.\.\.\s+/, ''); // Remove ticker prefix if present
+              
+              // Extract ticker from card title if present (format: "TICKER... Title")
+              let ticker: string | null = null;
+              const titleMatch = card.name.match(/^([A-Z]{1,5})\.\.\.\s+(.+)$/);
+              if (titleMatch) {
+                ticker = titleMatch[1].toUpperCase();
+              }
+              
+              sourceData = {
+                id: cardDescriptionUrl!.split('/').pop() || 'unknown',
+                title: cardTitle,
+                headline: cardTitle,
+                url: cardDescriptionUrl!,
+                body: '', // Will be populated from pitch/URL
+                teaser: '',
+                created: Math.floor(Date.now() / 1000),
+                updated: Math.floor(Date.now() / 1000),
+                channels: [],
+                stocks: ticker ? [ticker] : [],
+                tags: [],
+                // Mark that this is URL-only data
+                _urlOnly: true
+              };
+              
+              console.log(`   ✅ Created minimal source data from URL`);
+              console.log(`      Title: ${cardTitle}`);
+              console.log(`      URL: ${cardDescriptionUrl}`);
+              if (ticker) {
+                console.log(`      Ticker: ${ticker}`);
+              }
             }
           }
         } else {
