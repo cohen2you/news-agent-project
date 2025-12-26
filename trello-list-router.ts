@@ -114,7 +114,15 @@ export function determineTargetList(
     return listId;
   }
 
+  // Log which list IDs are missing for debugging
   console.warn(`   ⚠️  Router: No valid list ID found for type ${defaultListType}`);
+  console.warn(`   ⚠️  Available list IDs:`, {
+    MARKETS: TRELLO_LIST_IDS.MARKETS ? 'set' : 'NOT SET',
+    ECONOMY: TRELLO_LIST_IDS.ECONOMY ? 'set' : 'NOT SET',
+    COMMODITIES: TRELLO_LIST_IDS.COMMODITIES ? 'set' : 'NOT SET',
+    HEDGE_FUNDS: TRELLO_LIST_IDS.HEDGE_FUNDS ? 'set' : 'NOT SET',
+    BUSINESS: TRELLO_LIST_IDS.BUSINESS ? 'set' : 'NOT SET'
+  });
   return undefined;
 }
 

@@ -120,14 +120,18 @@ export async function runNewsCycle(): Promise<void> {
         }
         
         // Determine target list using router
+        console.log(`   🔍 Determining target list for: "${title.substring(0, 60)}..."`);
         const targetListId = determineTargetList(title, content, 'BUSINESS');
         
         if (!targetListId) {
           console.log(`   ⚠️  No valid list ID found for: "${title.substring(0, 50)}..."`);
+          console.log(`   ⚠️  Check that TRELLO_LIST_ID_MARKETS, TRELLO_LIST_ID_ECONOMY, TRELLO_LIST_ID_COMMODITIES, and TRELLO_LIST_ID_HEDGE_FUNDS are set in environment variables`);
           markAsProcessed(articleUrl); // Mark as processed even if no list found
           totalSkipped++;
           continue;
         }
+        
+        console.log(`   ✅ Target list determined: ${targetListId}`);
         
         try {
           // Create Trello card with full URL prominently displayed
