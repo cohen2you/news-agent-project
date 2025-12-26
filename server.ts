@@ -6858,7 +6858,8 @@ async function startServer() {
         startAutoButtonCheck();
         
         // Start WGO control card comment monitor
-        startWGOControlCardMonitor();
+        // DISABLED: WGO is manually triggered via comments, no need for constant polling
+        // startWGOControlCardMonitor();
         
         // Start email analyst agent polling if EMAIL_CHECK_INTERVAL is set
         const emailCheckInterval = process.env.EMAIL_CHECK_INTERVAL;
