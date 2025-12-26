@@ -7,10 +7,19 @@ import Parser from 'rss-parser';
 import { determineTargetList } from './trello-list-router';
 import { TrelloService } from './trello-service';
 
-// Initialize RSS Parser
+// Initialize RSS Parser with browser-like headers to avoid bot blocking
 const parser = new Parser({
   customFields: {
     item: ['contentSnippet', 'content']
+  },
+  requestOptions: {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'application/rss+xml, application/xml, text/xml; q=0.1, */*; q=0.1',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'Referer': 'https://www.bing.com/'
+    }
   }
 });
 
