@@ -4,8 +4,7 @@
  */
 
 import Parser from 'rss-parser';
-import axios from 'axios';
-import * as cheerio from 'cheerio';
+import { decodeGoogleNewsUrl } from './google-news-decoder';
 import { determineTargetList } from './trello-list-router';
 import { TrelloService } from './trello-service';
 
@@ -192,8 +191,9 @@ export async function runNewsCycle(): Promise<void> {
           continue;
         }
         
-        // Decode Google News redirect URL to get the real source URL
-        const articleUrl = await getOriginalUrl(googleUrl);
+        // Decode Google News Base64-encoded URL to get the real source URL
+        // This uses Google's internal Batch Execute API to decode the URL
+        const articleUrl = await decodeGoogleNewsUrl(googleUrl);
         
         // Check if already processed (use original URL for deduplication)
         if (isAlreadyProcessed(articleUrl)) {
