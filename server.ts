@@ -4027,6 +4027,33 @@ function isWithin36Hours(article: any): boolean {
   }
 }
 
+// Helper function to check if article is from past 7 days
+function isWithin7Days(article: any): boolean {
+  if (!article.created) return false;
+  
+  try {
+    let articleDate: Date;
+    if (typeof article.created === 'string') {
+      articleDate = new Date(article.created);
+    } else if (typeof article.created === 'number') {
+      // If it's already in milliseconds, use as-is; otherwise assume seconds
+      articleDate = article.created > 1000000000000 ? new Date(article.created) : new Date(article.created * 1000);
+    } else {
+      articleDate = new Date(article.created);
+    }
+    
+    if (isNaN(articleDate.getTime())) {
+      return false;
+    }
+    
+    const now = new Date();
+    const daysDiff = (now.getTime() - articleDate.getTime()) / (1000 * 60 * 60 * 24);
+    return daysDiff <= 7;
+  } catch (error) {
+    return false;
+  }
+}
+
 // Endpoint: Start auto-scan
 app.post("/auto-scan/start", async (req, res) => {
   console.log("\n🚀 [POST /auto-scan/start] Request received");
