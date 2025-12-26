@@ -1244,11 +1244,12 @@ app.post("/trello/webhook", async (req, res) => {
     if (actionType === 'commentCard') {
       // Trello webhook structure for commentCard: action.data.card.id and action.data.text
       const cardId = action.data?.card?.id;
-      const commentText = action.data?.text || '';
+      const commentId = action.id || action.data?.comment?.id || null;
+      const commentText = (action.data?.text || '').trim();
       
       console.log(`   💬 Comment card action detected`);
-      console.log(`   📋 Full action.data structure:`, JSON.stringify(action.data, null, 2).substring(0, 500));
       console.log(`   📋 Card ID: ${cardId || 'NOT FOUND'}`);
+      console.log(`   🆔 Comment ID: ${commentId || 'NOT FOUND'}`);
       console.log(`   💬 Comment: "${commentText.substring(0, 100)}"`);
       
       // Check if this is the WGO Control Card
@@ -1258,77 +1259,148 @@ app.post("/trello/webhook", async (req, res) => {
       
       if (!controlCardId) {
         console.log(`   ⚠️  TRELLO_WGO_CONTROL_CARD_ID not set in environment - skipping WGO comment handling`);
-      } else if (cardId && cardId === controlCardId) {
-        console.log(`   ✅ Comment is on WGO Control Card - checking for ticker...`);
+        return res.status(200).json({ received: true });
+      }
+      
+      if (!cardId || cardId !== controlCardId) {
+        if (cardId) {
+          console.log(`   ℹ️  Comment is on card ${cardId}, but it's not the WGO Control Card (expected ${controlCardId})`);
+        } else {
+          console.log(`   ⚠️  Could not extract card ID from webhook payload`);
+        }
+        return res.status(200).json({ received: true });
+      }
+      
+      // Deduplication: Skip if we've already processed this comment
+      if (commentId && processedWebhookComments.has(commentId)) {
+        console.log(`   ⏭️  Comment ${commentId} already processed, skipping duplicate webhook`);
+        return res.status(200).json({ received: true });
+      }
+      
+      // Filter out bot comments (same patterns as polling monitor)
+      const botCommentPatterns = [
+        /^✅\s*Starting WGO search/i,
+        /^✅\s*WGO Search Complete/i,
+        /^✅\s*WGO search/i,
+        /Found \d+ article\(s\):/i,
+        /Check the "WGO\/WIIM Stories" list/i,
+        /Pitch: Proposed Article:/i,
+        /Source: Benzinga News/i,
+        /^❌\s*Error/i
+      ];
+      
+      const isBotComment = botCommentPatterns.some(pattern => pattern.test(commentText));
+      if (isBotComment) {
+        console.log(`   🤖 Bot comment detected, skipping: "${commentText.substring(0, 50)}..."`);
+        // Still mark as processed to avoid reprocessing
+        if (commentId) {
+          processedWebhookComments.add(commentId);
+          // Limit size to prevent memory leaks
+          if (processedWebhookComments.size > MAX_PROCESSED_COMMENTS) {
+            const firstId = processedWebhookComments.values().next().value;
+            if (firstId) {
+              processedWebhookComments.delete(firstId);
+            }
+          }
+        }
+        return res.status(200).json({ received: true });
+      }
+      
+      console.log(`   ✅ Comment is on WGO Control Card - checking for ticker...`);
+      
+      // Extract ticker from comment - more restrictive pattern
+      // Match: "TICKER", "search TICKER", "TICKER please", etc.
+      // But NOT: "Starting WGO search" (bot comments filtered above)
+      // The ticker should be the main content of the comment (1-5 uppercase letters, possibly preceded by "search")
+      const tickerPattern = /^(?:search\s+)?([A-Z]{1,5})(?:\s|$)/i;
+      const match = commentText.match(tickerPattern);
+      
+      if (match) {
+        const ticker = match[1].toUpperCase();
         
-        // Extract ticker from comment (same pattern as polling monitor)
-        const tickerPattern = /(?:search\s+)?([A-Z]{1,5})\b/i;
-        const match = commentText.match(tickerPattern);
+        // Additional validation: ticker must be 1-5 uppercase letters only
+        if (!/^[A-Z]{1,5}$/.test(ticker)) {
+          console.log(`   ⚠️  Invalid ticker format: ${ticker}`);
+          return res.status(200).json({ received: true });
+        }
         
-        if (match && /^[A-Z]{1,5}$/.test(match[1].toUpperCase())) {
-          const ticker = match[1].toUpperCase();
-          console.log(`   ✅ Ticker detected: ${ticker}`);
-          
-          // Trigger WGO search in background (same logic as polling monitor)
-          (async () => {
+        // Mark as processed before starting (to prevent duplicate processing)
+        if (commentId) {
+          processedWebhookComments.add(commentId);
+          // Limit size to prevent memory leaks
+          if (processedWebhookComments.size > MAX_PROCESSED_COMMENTS) {
+            const firstId = processedWebhookComments.values().next().value;
+            if (firstId) {
+              processedWebhookComments.delete(firstId);
+            }
+          }
+        }
+        
+        console.log(`   ✅ Ticker detected: ${ticker}`);
+        
+        // Trigger WGO search in background (same logic as polling monitor)
+        (async () => {
+          try {
+            const { TrelloService } = await import("./trello-service");
+            const trello = new TrelloService();
+            
+            // Reply immediately that we're starting
+            await trello.addComment(controlCardId, `✅ Starting WGO search for **${ticker}**...`);
+            
+            // Trigger WGO search
+            const { wgoGraph } = await import("./wgo-agent");
+            const threadId = `wgo_comment_${Date.now()}`;
+            const config = { configurable: { thread_id: threadId } };
+            
+            console.log(`   🚀 Triggering WGO search for ${ticker}...`);
+            await wgoGraph.invoke({ topic: ticker }, config);
+            
+            const state = await wgoGraph.getState(config);
+            const newsArticles = state.values.newsArticles || [];
+            const pitch = state.values.pitch || '';
+            
+            // Reply with results
+            let replyText = `✅ WGO Search Complete for **${ticker}**\n\n`;
+            if (newsArticles.length > 0) {
+              replyText += `Found ${newsArticles.length} article(s):\n\n`;
+              newsArticles.slice(0, 5).forEach((article: any, index: number) => {
+                const title = article.title || article.headline || 'Untitled';
+                replyText += `${index + 1}. ${title}\n`;
+              });
+              if (newsArticles.length > 5) {
+                replyText += `\n... and ${newsArticles.length - 5} more`;
+              }
+              replyText += `\n\nCheck the "WGO/WIIM Stories" list for the new card.`;
+            } else {
+              replyText += `No recent articles found for ${ticker}.`;
+            }
+            
+            await trello.addComment(controlCardId, replyText);
+            console.log(`   ✅ WGO search completed and replied to comment`);
+          } catch (error: any) {
+            console.error(`   ❌ Error processing WGO comment:`, error);
             try {
               const { TrelloService } = await import("./trello-service");
               const trello = new TrelloService();
-              
-              // Reply immediately that we're starting
-              await trello.addComment(controlCardId, `✅ Starting WGO search for **${ticker}**...`);
-              
-              // Trigger WGO search
-              const { wgoGraph } = await import("./wgo-agent");
-              const threadId = `wgo_comment_${Date.now()}`;
-              const config = { configurable: { thread_id: threadId } };
-              
-              console.log(`   🚀 Triggering WGO search for ${ticker}...`);
-              await wgoGraph.invoke({ topic: ticker }, config);
-              
-              const state = await wgoGraph.getState(config);
-              const newsArticles = state.values.newsArticles || [];
-              const pitch = state.values.pitch || '';
-              
-              // Reply with results
-              let replyText = `✅ WGO Search Complete for **${ticker}**\n\n`;
-              if (newsArticles.length > 0) {
-                replyText += `Found ${newsArticles.length} article(s):\n\n`;
-                newsArticles.slice(0, 5).forEach((article: any, index: number) => {
-                  const title = article.title || article.headline || 'Untitled';
-                  replyText += `${index + 1}. ${title}\n`;
-                });
-                if (newsArticles.length > 5) {
-                  replyText += `\n... and ${newsArticles.length - 5} more`;
-                }
-                replyText += `\n\nCheck the "WGO/WIIM Stories" list for the new card.`;
-              } else {
-                replyText += `No recent articles found for ${ticker}.`;
-              }
-              
-              await trello.addComment(controlCardId, replyText);
-              console.log(`   ✅ WGO search completed and replied to comment`);
-            } catch (error: any) {
-              console.error(`   ❌ Error processing WGO comment:`, error);
-              try {
-                const { TrelloService } = await import("./trello-service");
-                const trello = new TrelloService();
-                await trello.addComment(controlCardId, `❌ Error processing WGO search: ${error.message}`);
-              } catch (commentError) {
-                // Ignore comment errors
-              }
+              await trello.addComment(controlCardId, `❌ Error processing WGO search: ${error.message}`);
+            } catch (commentError) {
+              // Ignore comment errors
             }
-          })();
-        } else {
-          console.log(`   ℹ️  Comment doesn't contain a valid ticker, skipping`);
-          console.log(`   💬 Comment text was: "${commentText}"`);
-          console.log(`   🔍 Ticker pattern match result: ${match ? 'MATCH' : 'NO MATCH'}`);
-        }
-      } else if (cardId) {
-        console.log(`   ℹ️  Comment is on card ${cardId}, but it's not the WGO Control Card (expected ${controlCardId})`);
+          }
+        })();
       } else {
-        console.log(`   ⚠️  Could not extract card ID from webhook payload`);
-        console.log(`   📋 action.data structure:`, JSON.stringify(action.data, null, 2).substring(0, 500));
+        console.log(`   ℹ️  Comment doesn't contain a valid ticker pattern, skipping`);
+        console.log(`   💬 Comment text was: "${commentText}"`);
+        // Still mark as processed to avoid reprocessing
+        if (commentId) {
+          processedWebhookComments.add(commentId);
+          if (processedWebhookComments.size > MAX_PROCESSED_COMMENTS) {
+            const firstId = processedWebhookComments.values().next().value;
+            if (firstId) {
+              processedWebhookComments.delete(firstId);
+            }
+          }
+        }
       }
       
       // Always return 200 to acknowledge webhook receipt
@@ -3608,6 +3680,10 @@ let autoButtonCheckInterval: NodeJS.Timeout | null = null;
 let wgoControlCardMonitorInterval: NodeJS.Timeout | null = null;
 let lastProcessedCommentId: string | null = null;
 let autoButtonCheckActive = false;
+
+// Track processed comment IDs for webhook deduplication
+const processedWebhookComments = new Set<string>();
+const MAX_PROCESSED_COMMENTS = 1000; // Limit size to prevent memory leaks
 
 // Function to check cards and add "Process For AI" buttons automatically
 async function checkAndAddProcessButtons() {
