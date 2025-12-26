@@ -2125,6 +2125,16 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
     const { TrelloService } = await import("./trello-service");
     const trello = new TrelloService();
     
+    // Get card URL for redirect (before moving card)
+    let cardUrl = `https://trello.com/c/${cardId}`;
+    try {
+      const card = await trello.getCard(cardId);
+      cardUrl = card.url;
+      console.log(`   🔗 Card URL: ${cardUrl}`);
+    } catch (urlError: any) {
+      console.warn(`   ⚠️  Could not fetch card URL, using default: ${urlError.message}`);
+    }
+    
     // Move card to "In Progress" list immediately
     const inProgressListId = process.env.TRELLO_LIST_ID_IN_PROGRESS;
     let cardMoved = false;
@@ -2142,14 +2152,14 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
     }
     
     // Return immediately after moving card, process generation in background
-    // Return minimal HTML that auto-closes the window
+    // Redirect back to the Trello card instead of about:blank
     const autoCloseHtml = `
 <!DOCTYPE html>
 <html>
 <head>
     <title>Processing...</title>
     <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="2;url=about:blank">
+    <meta http-equiv="refresh" content="1;url=${cardUrl}">
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -3203,15 +3213,25 @@ app.get("/analyst-story/generate/:cardId", async (req, res) => {
       console.log(`   ⚠️  TRELLO_LIST_ID_IN_PROGRESS not set, skipping card move to In Progress`);
     }
     
+    // Get card URL for redirect (before moving card)
+    let cardUrl = `https://trello.com/c/${cardId}`;
+    try {
+      const card = await trello.getCard(cardId);
+      cardUrl = card.url;
+      console.log(`   🔗 Card URL: ${cardUrl}`);
+    } catch (urlError: any) {
+      console.warn(`   ⚠️  Could not fetch card URL, using default: ${urlError.message}`);
+    }
+    
     // Return immediately with auto-close page, process generation in background
-    // Use same auto-close mechanism as WGO/PR endpoints for consistency
+    // Redirect back to the Trello card instead of about:blank
     const autoCloseHtml = `
 <!DOCTYPE html>
 <html>
 <head>
     <title>Processing...</title>
     <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="2;url=about:blank">
+    <meta http-equiv="refresh" content="1;url=${cardUrl}">
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
