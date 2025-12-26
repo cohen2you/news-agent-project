@@ -7,19 +7,10 @@ import Parser from 'rss-parser';
 import { determineTargetList } from './trello-list-router';
 import { TrelloService } from './trello-service';
 
-// Initialize RSS Parser with browser-like headers to avoid bot blocking
+// Initialize RSS Parser
 const parser = new Parser({
   customFields: {
     item: ['contentSnippet', 'content']
-  },
-  requestOptions: {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'application/rss+xml, application/xml, text/xml; q=0.1, */*; q=0.1',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Accept-Encoding': 'gzip, deflate, br',
-      'Referer': 'https://www.bing.com/'
-    }
   }
 });
 
@@ -108,21 +99,21 @@ export async function runNewsCycle(): Promise<void> {
       for (const item of latestItems) {
         totalProcessed++;
         
-        // Bing News provides clean, direct links - no decoding needed!
-        const articleUrl = item.link || item.guid || '';
+        // Google News link (user will click this and paste the real source URL)
+        const googleNewsUrl = item.link || item.guid || '';
         const title = item.title || 'Untitled Article';
         // Use contentSnippet (provided by RSS parser) or fallback to empty string
         const content = item.contentSnippet || '';
         
         // Skip if no URL (can't track duplicates)
-        if (!articleUrl) {
+        if (!googleNewsUrl) {
           console.log(`   ⚠️  Skipping article without URL: "${title.substring(0, 50)}..."`);
           totalSkipped++;
           continue;
         }
         
-        // Check if already processed (using clean URL from Bing)
-        if (isAlreadyProcessed(articleUrl)) {
+        // Check if already processed (using Google News URL for duplicate tracking)
+        if (isAlreadyProcessed(googleNewsUrl)) {
           console.log(`   ⏭️  Already processed: "${title.substring(0, 50)}..."`);
           totalSkipped++;
           continue;
@@ -135,7 +126,7 @@ export async function runNewsCycle(): Promise<void> {
         if (!targetListId) {
           console.log(`   ⚠️  No valid list ID found for: "${title.substring(0, 50)}..."`);
           console.log(`   ⚠️  Check that TRELLO_LIST_ID_MARKETS, TRELLO_LIST_ID_ECONOMY, TRELLO_LIST_ID_COMMODITIES, and TRELLO_LIST_ID_HEDGE_FUNDS are set in environment variables`);
-          markAsProcessed(articleUrl); // Mark as processed even if no list found
+          markAsProcessed(googleNewsUrl); // Mark as processed even if no list found
           totalSkipped++;
           continue;
         }
@@ -143,13 +134,19 @@ export async function runNewsCycle(): Promise<void> {
         console.log(`   ✅ Target list determined: ${targetListId}`);
         
         try {
-          // Create Trello card with full URL prominently displayed
+          // Create Trello card with Google News link
+          // User will click the link, get redirected to the real source, and paste the source URL below
           const baseUrl = process.env.APP_URL || 'http://localhost:3001';
           
-          // Build card description with URL prominently displayed
-          let cardDescription = `**Source URL:** ${articleUrl}\n\n`;
+          // Build card description with instructions for user
+          let cardDescription = `**Google News Link:** [${googleNewsUrl}](${googleNewsUrl})\n\n`;
+          cardDescription += `**Instructions:**\n`;
+          cardDescription += `1. Click the Google News link above\n`;
+          cardDescription += `2. Copy the real source URL (e.g., cnbc.com, reuters.com, etc.)\n`;
+          cardDescription += `3. Paste it in the "Source URL" field below\n\n`;
+          cardDescription += `**Source URL:** \n\n`;
           if (content) {
-            cardDescription += `${content.substring(0, 1000)}${content.length > 1000 ? '...' : ''}\n\n`;
+            cardDescription += `---\n\n**Article Summary:**\n${content.substring(0, 1000)}${content.length > 1000 ? '...' : ''}\n\n`;
           }
           
           // Create card first
@@ -169,9 +166,9 @@ export async function runNewsCycle(): Promise<void> {
           console.log(`   ✅ Created card: "${title.substring(0, 50)}..."`);
           console.log(`      → List ID: ${targetListId}`);
           console.log(`      → Card URL: ${card.url}`);
-          console.log(`      → Source URL: ${articleUrl}`);
+          console.log(`      → Google News URL: ${googleNewsUrl}`);
           
-          markAsProcessed(articleUrl);
+          markAsProcessed(googleNewsUrl);
           totalCreated++;
           
           // Small delay to avoid rate limiting
