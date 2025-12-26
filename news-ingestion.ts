@@ -99,32 +99,20 @@ export async function runNewsCycle(): Promise<void> {
       for (const item of latestItems) {
         totalProcessed++;
         
-        const googleUrl = item.link || item.guid || '';
+        // Bing News provides clean, direct links - no decoding needed!
+        const articleUrl = item.link || item.guid || '';
         const title = item.title || 'Untitled Article';
         // Use contentSnippet (provided by RSS parser) or fallback to empty string
         const content = item.contentSnippet || '';
         
         // Skip if no URL (can't track duplicates)
-        if (!googleUrl) {
+        if (!articleUrl) {
           console.log(`   ⚠️  Skipping article without URL: "${title.substring(0, 50)}..."`);
           totalSkipped++;
           continue;
         }
         
-        // Decode Google News Base64-encoded URL to get the real source URL
-        // This uses Puppeteer (headless browser) to follow Google's redirects
-        const articleUrl = await decodeGoogleNewsUrl(googleUrl);
-        
-        // Safety check: Skip if URL decoding failed (still contains news.google.com)
-        // This prevents the AI from scraping Google's redirect/consent page and hallucinating stories
-        if (articleUrl.includes('news.google.com')) {
-          console.log(`   🚫 Skipping card: Could not resolve source URL (decoding failed)`);
-          console.log(`      Original URL: ${googleUrl.substring(0, 80)}...`);
-          totalSkipped++;
-          continue; // Skip this item entirely!
-        }
-        
-        // Check if already processed (use decoded URL for deduplication)
+        // Check if already processed (using clean URL from Bing)
         if (isAlreadyProcessed(articleUrl)) {
           console.log(`   ⏭️  Already processed: "${title.substring(0, 50)}..."`);
           totalSkipped++;
@@ -142,7 +130,7 @@ export async function runNewsCycle(): Promise<void> {
         }
         
         try {
-          // Create Trello card with full URL prominently displayed (use decoded original URL)
+          // Create Trello card with full URL prominently displayed
           const baseUrl = process.env.APP_URL || 'http://localhost:3001';
           
           // Build card description with URL prominently displayed
@@ -170,11 +158,11 @@ export async function runNewsCycle(): Promise<void> {
           console.log(`      → Card URL: ${card.url}`);
           console.log(`      → Source URL: ${articleUrl}`);
           
-          markAsProcessed(articleUrl); // Track using decoded URL
+          markAsProcessed(articleUrl);
           totalCreated++;
           
-          // Small delay to avoid rate limiting (especially important with URL decoding)
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Small delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 500));
           
         } catch (error: any) {
           console.error(`   ❌ Error creating card for "${title.substring(0, 50)}...":`, error.message);
