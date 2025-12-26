@@ -100,7 +100,8 @@ export async function runNewsCycle(): Promise<void> {
         
         const articleUrl = item.link || item.guid || '';
         const title = item.title || 'Untitled Article';
-        const content = item.contentSnippet || item.content || item.description || '';
+        // Use contentSnippet (provided by RSS parser) or fallback to empty string
+        const content = item.contentSnippet || '';
         
         // Skip if no URL (can't track duplicates)
         if (!articleUrl) {
