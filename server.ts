@@ -2152,48 +2152,20 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
     }
     
     // Return immediately after moving card, process generation in background
-    // Redirect back to the Trello card instead of about:blank
+    // Redirect immediately back to Trello card using JavaScript (faster than meta refresh)
     const autoCloseHtml = `
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Processing...</title>
+    <title>Redirecting...</title>
     <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="1;url=${cardUrl}">
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background: #f5f5f5;
-            color: #059669;
-        }
-        .message {
-            text-align: center;
-            padding: 20px;
-        }
-    </style>
     <script>
-        // Try to close the window immediately
-        window.onload = function() {
-            setTimeout(function() {
-                window.close();
-                // If window doesn't close (blocked by browser), show message
-                setTimeout(function() {
-                    document.body.innerHTML = '<div class="message"><h2>✅ Card moved to In Progress</h2><p>Article generation has started. You can close this window.</p></div>';
-                }, 500);
-            }, 100);
-        };
+        // Immediate redirect - happens as soon as script loads
+        window.location.replace('${cardUrl}');
     </script>
 </head>
 <body>
-    <div class="message">
-        <h2>Processing...</h2>
-        <p>Moving card to In Progress...</p>
-    </div>
+    <p>Redirecting...</p>
 </body>
 </html>`;
     
@@ -3224,48 +3196,20 @@ app.get("/analyst-story/generate/:cardId", async (req, res) => {
     }
     
     // Return immediately with auto-close page, process generation in background
-    // Redirect back to the Trello card instead of about:blank
+    // Redirect immediately back to Trello card using JavaScript (faster than meta refresh)
     const autoCloseHtml = `
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Processing...</title>
+    <title>Redirecting...</title>
     <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="1;url=${cardUrl}">
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background: #f5f5f5;
-            color: #059669;
-        }
-        .message {
-            text-align: center;
-            padding: 20px;
-        }
-    </style>
     <script>
-        // Try to close the window immediately
-        window.onload = function() {
-            setTimeout(function() {
-                window.close();
-                // If window doesn't close (blocked by browser), show message
-                setTimeout(function() {
-                    document.body.innerHTML = '<div class="message"><h2>✅ Card moved to In Progress</h2><p>Analyst story generation has started. You can close this window.</p></div>';
-                }, 500);
-            }, 100);
-        };
+        // Immediate redirect - happens as soon as script loads
+        window.location.replace('${cardUrl}');
     </script>
 </head>
 <body>
-    <div class="message">
-        <h2>Processing...</h2>
-        <p>Moving card to In Progress...</p>
-    </div>
+    <p>Redirecting...</p>
 </body>
 </html>`;
     res.send(autoCloseHtml);
