@@ -4057,9 +4057,9 @@ function startWGOControlCardMonitor() {
     return;
   }
 
-  console.log(`\n💬 Starting WGO control card comment monitor`);
+  console.log(`\n💬 Starting WGO control card comment monitor (backup/fallback)`);
   console.log(`   📌 Control Card ID: ${controlCardId}`);
-  console.log(`   ⏰ Will check for new comments every 10 seconds`);
+  console.log(`   ⏰ Will check for new comments every 30 seconds (webhooks preferred but polling as backup)`);
   
   // Run immediately (but don't await - it's async)
   console.log(`   🚀 Running initial check now...`);
@@ -4067,12 +4067,12 @@ function startWGOControlCardMonitor() {
     console.error(`\n❌ [WGO Control Card] Error in initial check:`, error);
   });
   
-  // Then check every 10 seconds
+  // Then check every 30 seconds (less frequent since webhooks should handle most cases)
   wgoControlCardMonitorInterval = setInterval(() => {
     monitorWGOControlCardComments().catch(error => {
       console.error(`\n❌ [WGO Control Card] Error in periodic check:`, error);
     });
-  }, 10000); // 10 seconds
+  }, 30000); // 30 seconds (backup polling - webhooks should handle instant responses)
   
   console.log(`   ✅ Monitor started successfully`);
 }
@@ -7050,10 +7050,10 @@ async function startServer() {
         // Start automatic button checker for manual cards
         startAutoButtonCheck();
         
-        // WGO Control Card comment monitoring is now handled via Trello webhooks
-        // The webhook handler detects commentCard actions on the WGO Control Card instantly
-        // No need for polling - webhooks are more efficient and responsive
-        // startWGOControlCardMonitor(); // Disabled - using webhooks instead
+        // WGO Control Card comment monitoring: Try webhooks first (instant), fallback to polling
+        // Webhooks are preferred but may not always fire reliably, so we also enable polling as backup
+        // Polling runs every 30 seconds (less frequent than before) to reduce load while still providing reliability
+        startWGOControlCardMonitor(); // Enable polling as fallback/backup if webhooks don't fire
         
         // Start email analyst agent polling if EMAIL_CHECK_INTERVAL is set
         const emailCheckInterval = process.env.EMAIL_CHECK_INTERVAL;
