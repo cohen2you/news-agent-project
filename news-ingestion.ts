@@ -62,12 +62,13 @@ async function getOriginalUrl(googleUrl: string): Promise<string> {
     console.log(`   🔍 Decoding Google News URL: ${googleUrl.substring(0, 80)}...`);
     
     // Google News links are redirects. We fetch the page to find the real target.
-    // Follow redirects (Google may use multiple redirects) but limit to 5
+    // Don't follow redirects automatically - we want to parse the redirect page HTML
     const response = await axios.get(googleUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       },
-      maxRedirects: 5, // Follow redirects to get the actual page
+      maxRedirects: 0, // Don't follow redirects - we want to parse the redirect page
+      validateStatus: (status) => status >= 200 && status < 400, // Accept 2xx and 3xx
       timeout: 10000 // 10 second timeout
     });
     
@@ -101,17 +102,6 @@ async function getOriginalUrl(googleUrl: string): Promise<string> {
         // If URL parsing fails, return as-is
         console.log(`   ✅ Decoded to: ${realUrl.substring(0, 100)}...`);
         return realUrl;
-      }
-    }
-    
-    // If no URL found in HTML, check if the response URL is different from the original
-    // (meaning we were redirected to the actual article)
-    if (response.request?.res?.responseUrl && response.request.res.responseUrl !== googleUrl) {
-      const responseUrl = response.request.res.responseUrl;
-      // If the response URL is not a Google News URL, it's likely the actual article
-      if (!responseUrl.includes('news.google.com')) {
-        console.log(`   ✅ Found redirect URL: ${responseUrl.substring(0, 100)}...`);
-        return responseUrl;
       }
     }
     
