@@ -3204,30 +3204,50 @@ app.get("/analyst-story/generate/:cardId", async (req, res) => {
     }
     
     // Return immediately with auto-close page, process generation in background
-    // Improved auto-close that works better across browsers
-    const autoCloseHtml = `<!DOCTYPE html><html><head><title>Processing...</title><meta charset="UTF-8"><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#f5f5f5;color:#059669}.message{text-align:center;padding:20px;max-width:400px}</style><script>
-(function() {
-  // Show processing message immediately
-  document.body.innerHTML = '<div class="message"><h2>✅ Processing Started</h2><p>Analyst story generation has started.</p><p><small>This window will close automatically...</small></p></div>';
-  
-  // Try to close the window (works if opened by JavaScript)
-  // If it doesn't close (e.g., user opened link directly), show success message
-  setTimeout(function() {
-    try {
-      window.close();
-      // If window.close() doesn't work, show message and redirect
-      setTimeout(function() {
-        if (!document.hidden) {
-          document.body.innerHTML = '<div class="message"><h2>✅ Processing Started</h2><p>Analyst story generation is running in the background.</p><p><small>You can close this window now.</small></p></div>';
+    // Use same auto-close mechanism as WGO/PR endpoints for consistency
+    const autoCloseHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Processing...</title>
+    <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="2;url=about:blank">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: #f5f5f5;
+            color: #059669;
         }
-      }, 500);
-    } catch(e) {
-      // Window can't be closed (e.g., not opened by script)
-      document.body.innerHTML = '<div class="message"><h2>✅ Processing Started</h2><p>Analyst story generation is running in the background.</p><p><small>You can close this window now.</small></p></div>';
-    }
-  }, 1500);
-})();
-</script></head><body><div class="message"><h2>Processing...</h2><p>Starting analyst story generation...</p></div></body></html>`;
+        .message {
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+    <script>
+        // Try to close the window immediately
+        window.onload = function() {
+            setTimeout(function() {
+                window.close();
+                // If window doesn't close (blocked by browser), show message
+                setTimeout(function() {
+                    document.body.innerHTML = '<div class="message"><h2>✅ Card moved to In Progress</h2><p>Analyst story generation has started. You can close this window.</p></div>';
+                }, 500);
+            }, 100);
+        };
+    </script>
+</head>
+<body>
+    <div class="message">
+        <h2>Processing...</h2>
+        <p>Moving card to In Progress...</p>
+    </div>
+</body>
+</html>`;
     res.send(autoCloseHtml);
     
     // Process story generation in background
