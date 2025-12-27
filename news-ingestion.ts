@@ -14,9 +14,11 @@ const parser = new Parser({
   }
 });
 
-// --- THE WORKING FEED LIST (Cleaned of Blocks & Broken Feeds) ---
+// --- THE WORKING FEED LIST (Updated with Nasdaq & AlphaStreet) ---
 const FEEDS = [
   // 1. MARKETS (Reliable & Fast)
+  { name: "Nasdaq Original", url: 'https://www.nasdaq.com/feed/rssout/news/current' },
+  { name: "AlphaStreet", url: 'https://news.alphastreet.com/feed/' },
   { name: "CNBC Markets", url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664' },
   { name: "Business Insider", url: 'https://markets.businessinsider.com/rss/news' },
   { name: "Yahoo Finance Top", url: 'https://finance.yahoo.com/news/rssindex' },
