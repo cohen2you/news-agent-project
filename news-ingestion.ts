@@ -181,17 +181,6 @@ export async function runNewsCycle(): Promise<void> {
             continue; // Skip to next item
           }
           
-          console.log(`   ✅ Created card: "${title.substring(0, 50)}..."`);
-          console.log(`      → List ID: ${targetListId}`);
-          console.log(`      → Card URL: ${card.url}`);
-          console.log(`      → Google News URL: ${googleNewsUrl}`);
-          
-          markAsProcessed(googleNewsUrl);
-          totalCreated++;
-          
-          // Small delay to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
         } catch (error: any) {
           console.error(`   ❌ Error creating card for "${title.substring(0, 50)}...":`, error.message);
           // Don't mark as processed if creation failed - allow retry
