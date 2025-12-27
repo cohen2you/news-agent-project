@@ -1431,8 +1431,15 @@ app.post("/trello/webhook", async (req, res) => {
       }
       
       const cardId = cardData.id;
-      const listId = cardData.idList;
-      const previousListId = action.data?.cardBefore?.idList;
+      // For updateCard, list ID can be in multiple places:
+      // 1. action.data.list.id (most common for updateCard)
+      // 2. cardData.idList (for createCard or when card is moved)
+      // 3. action.data.cardAfter.idList (when card is moved)
+      const listId = action.data?.list?.id || 
+                     cardData.idList || 
+                     action.data?.cardAfter?.idList ||
+                     action.data?.listAfter?.id;
+      const previousListId = action.data?.cardBefore?.idList || action.data?.listBefore?.id;
       
       console.log(`   📋 Card ID: ${cardId}`);
       console.log(`   📋 List ID: ${listId}`);
