@@ -1621,8 +1621,16 @@ app.post("/trello/webhook", async (req, res) => {
                              !articleTextMatch[1].includes('*(Paste article text here if scraping fails)*');
       
       // For news ingestion cards: If article text has been added, re-add the Process For AI button
-      if (isNewsIngestionList && hasArticleText && !hasButton && !hasPRData) {
-        console.log(`   ✅ News ingestion card has article text but no button - adding "Process For AI" button`);
+      if (isNewsIngestionList && !hasButton && !hasPRData) {
+        // Debug logging
+        console.log(`   🔍 News ingestion card detected - checking for article text...`);
+        console.log(`   🔍 hasArticleText: ${hasArticleText}`);
+        console.log(`   🔍 Card description length: ${cardDesc.length}`);
+        console.log(`   🔍 Contains "Article Text:": ${cardDesc.includes('Article Text:')}`);
+        
+        // If we have article text, add the button
+        if (hasArticleText) {
+          console.log(`   ✅ News ingestion card has article text but no button - adding "Process For AI" button`);
         
         const { TrelloService } = await import("./trello-service");
         const trello = new TrelloService();
@@ -1642,9 +1650,12 @@ app.post("/trello/webhook", async (req, res) => {
         
         try {
           await trello.updateCardDescription(cardId, updatedDesc);
-          console.log(`   ✅ Successfully re-added "Process For AI" button to news ingestion card ${cardId}`);
+            console.log(`   ✅ Successfully re-added "Process For AI" button to news ingestion card ${cardId}`);
         } catch (updateError: any) {
           console.error(`   ❌ Error updating card: ${updateError.message}`);
+        }
+        } else {
+          console.log(`   ℹ️  News ingestion card but no article text detected (text length check failed or placeholder text found)`);
         }
       } else if ((isPRList || isWGOList) && hasUrl && !hasButton && !hasPRData) {
         // Existing logic for PR and WGO cards
