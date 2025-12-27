@@ -88,7 +88,7 @@ function routeArticle(feedName: string, title: string, snippet: string): string 
   if (feedName.includes("Tech") || feedName.includes("Verge")) return LIST_IDS.TECH;
   
   // Route the new Hedge Fund feeds directly
-  if (feedName.includes("ValueWalk") || feedName.includes("Insider Monkey") || feedName.includes("Dealbreaker")) {
+  if (feedName.includes("ValueWalk") || feedName.includes("Insider") || feedName.includes("Dealbreaker")) {
     return LIST_IDS.HEDGE_FUNDS;
   }
 
@@ -100,7 +100,7 @@ function routeArticle(feedName: string, title: string, snippet: string): string 
   }
 
   // Macro / Economy
-  if (text.match(/el-erian|larry summers|powell|yellen|lagarde|gdp|cpi|pce|jobs|unemployment/)) {
+  if (text.match(/el-erian|larry summers|powell|yellen|lagarde|gdp|cpi|pce|jobs|unemployment|recession/)) {
     return LIST_IDS.ECONOMY;
   }
 
@@ -111,7 +111,7 @@ function routeArticle(feedName: string, title: string, snippet: string): string 
 
   // C. Fallback Keyword Routing
   if (text.match(/oil|gold|silver|copper|gas|crude/)) return LIST_IDS.COMMODITIES;
-  if (text.match(/rate|recession|inflation|yield/)) return LIST_IDS.ECONOMY;
+  if (text.match(/rate|inflation|yield/)) return LIST_IDS.ECONOMY;
   
   // Default: EVERYTHING else (Earnings, S&P 500 movements, Analyst Upgrades) goes to Markets
   return LIST_IDS.MARKETS;
