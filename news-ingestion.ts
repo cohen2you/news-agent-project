@@ -1,10 +1,10 @@
 /**
  * News Ingestion Service
- * Fetches news from RSS feeds and routes articles to appropriate Trello lists
+ * Hybrid feed system: Reliable direct feeds (CNBC, Investing.com, Yahoo) + Search feeds (Bing)
  */
 
 import Parser from 'rss-parser';
-import { determineTargetList } from './trello-list-router';
+import axios from 'axios';
 import { TrelloService } from './trello-service';
 
 // Initialize RSS Parser
@@ -14,33 +14,61 @@ const parser = new Parser({
   }
 });
 
-// Define RSS Feeds for different content categories
-// Using Google News RSS - users will manually click the link and paste the real source URL
+// THE HYBRID FEED LIST
+// We use CNBC/Investing.com for reliability (direct links) and Bing for specific keyword searches.
 const FEEDS = [
-  // Hedge Funds & Institutional Investors
-  {
-    url: 'https://news.google.com/rss/search?q="Hedge+Fund"+OR+"Bill+Ackman"+OR+"Ray+Dalio"+OR+"Ken+Griffin"+OR+"Citadel"+OR+"Pershing+Square"+OR+"13F"&hl=en-US&gl=US&ceid=US:en',
-    name: 'Hedge Funds & Institutional'
+  // --- RELIABLE DIRECT FEEDS (Clean Links, No Blocking) ---
+  { 
+    name: "CNBC Markets", 
+    url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664' 
   },
-  
-  // Commodities
-  {
-    url: 'https://news.google.com/rss/search?q="Oil+Price"+OR+"Gold+Price"+OR+"Natural+Gas"+OR+"Commodities"+OR+"Crude+Oil"+OR+"WTI"+OR+"Brent"&hl=en-US&gl=US&ceid=US:en',
-    name: 'Commodities'
+  { 
+    name: "CNBC Economy", 
+    url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258' 
   },
-  
-  // Economy
-  {
-    url: 'https://news.google.com/rss/search?q="Inflation"+OR+"CPI"+OR+"Fed+Rate"+OR+"GDP"+OR+"Recession"+OR+"FOMC"+OR+"Federal+Reserve"&hl=en-US&gl=US&ceid=US:en',
-    name: 'Economy'
+  { 
+    name: "Investing.com Commodities", 
+    url: 'https://www.investing.com/rss/commodities.rss' 
   },
-  
-  // Broad Markets
-  {
-    url: 'https://news.google.com/rss/search?q="Stock+Market"+OR+"S%26P+500"+OR+"Nasdaq"+OR+"Dow+Jones"+OR+"Wall+Street"&hl=en-US&gl=US&ceid=US:en',
-    name: 'Markets'
+  { 
+    name: "Yahoo Finance Top", 
+    url: 'https://finance.yahoo.com/news/rssindex' 
+  },
+
+  // --- SEARCH FEEDS (Good for specific niches, but might block occasionally) ---
+  { 
+    name: "Bing: Hedge Funds", 
+    url: 'https://www.bing.com/news/search?q=Hedge+Fund+OR+Bill+Ackman+OR+Ray+Dalio+OR+Ken+Griffin+OR+Citadel&format=rss' 
   }
 ];
+
+// Define List IDs (From your .env)
+const LIST_IDS = {
+  MARKETS: process.env.TRELLO_LIST_ID_MARKETS || '',
+  ECONOMY: process.env.TRELLO_LIST_ID_ECONOMY || '',
+  COMMODITIES: process.env.TRELLO_LIST_ID_COMMODITIES || '',
+  HEDGE_FUNDS: process.env.TRELLO_LIST_ID_HEDGE_FUNDS || '',
+  DEFAULT: process.env.TRELLO_LIST_ID || '' 
+};
+
+// Smart Router Logic
+function routeArticle(feedName: string, title: string, snippet: string): string {
+  const text = (title + " " + snippet).toLowerCase();
+  
+  // A. Source-Based Routing (If it comes from the "Economy" feed, send it there!)
+  if (feedName.includes("Economy")) return LIST_IDS.ECONOMY;
+  if (feedName.includes("Commodities")) return LIST_IDS.COMMODITIES;
+  if (feedName.includes("Hedge Funds")) return LIST_IDS.HEDGE_FUNDS;
+  if (feedName.includes("Markets")) return LIST_IDS.MARKETS;
+
+  // B. Content-Based Routing (Fallback for general feeds like Yahoo)
+  if (text.match(/hedge fund|ackman|dalio|griffin|citadel|13f/)) return LIST_IDS.HEDGE_FUNDS;
+  if (text.match(/oil|gold|silver|copper|wheat|gas|crude/)) return LIST_IDS.COMMODITIES;
+  if (text.match(/inflation|cpi|fed|powell|gdp|rates|recession/)) return LIST_IDS.ECONOMY;
+  if (text.match(/s&p|nasdaq|dow|stocks|market|rally|selloff/)) return LIST_IDS.MARKETS;
+
+  return LIST_IDS.DEFAULT || LIST_IDS.MARKETS;
+}
 
 // Track processed article URLs to avoid duplicates
 const processedArticleUrls = new Set<string>();
@@ -201,4 +229,3 @@ export async function runNewsCycle(): Promise<void> {
   console.log(`   Skipped (duplicates/errors): ${totalSkipped}`);
   console.log(`${"=".repeat(60)}\n`);
 }
-
