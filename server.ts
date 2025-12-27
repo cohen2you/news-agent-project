@@ -1848,6 +1848,119 @@ app.get("/trello/process-card/:cardId", async (req, res) => {
     // Process in background
     (async () => {
       try {
+        // For news ingestion cards, scrape the article using news-story-generator /api/scrape endpoint
+        if (isNewsIngestionList && articleUrl) {
+          console.log(`   🌐 News ingestion card detected - scraping article from URL...`);
+          
+          const scrapeUrl = process.env.ARTICLE_GEN_APP_STORY_URL 
+            ? process.env.ARTICLE_GEN_APP_STORY_URL.replace('/api/generate/story', '/api/scrape').replace('/api/generate/pr-story', '/api/scrape')
+            : 'http://localhost:3000/api/scrape';
+          
+          console.log(`   🔗 Calling scrape endpoint: ${scrapeUrl}`);
+          
+          try {
+            const scrapeResponse = await fetch(scrapeUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ url: articleUrl }),
+            });
+            
+            if (!scrapeResponse.ok) {
+              throw new Error(`Scraping failed: ${scrapeResponse.status} ${scrapeResponse.statusText}`);
+            }
+            
+            const scrapeData = await scrapeResponse.json();
+            const scrapedText = scrapeData.text || scrapeData.content || '';
+            
+            if (!scrapedText || scrapedText.trim().length < 50) {
+              throw new Error('Scraped content is too short or empty');
+            }
+            
+            console.log(`   ✅ Successfully scraped article (${scrapedText.length} chars)`);
+            
+            // Store scraped content in card description (hidden in HTML comment)
+            const scrapedData = {
+              title: card.name,
+              url: articleUrl,
+              body: scrapedText,
+              content: scrapedText,
+              teaser: scrapedText.substring(0, 500),
+              created: Math.floor(Date.now() / 1000),
+              _scraped: true
+            };
+            
+            const scrapedDataJson = JSON.stringify(scrapedData);
+            const scrapedDataBase64 = Buffer.from(scrapedDataJson).toString('base64');
+            
+            // Update card with "Generate Article" button and store scraped data
+            const baseUrl = process.env.APP_URL || 'http://localhost:3001';
+            const generateArticleUrl = `${baseUrl}/trello/generate-article/${cardId}?selectedApp=story`;
+            
+            let updatedDesc = card.desc || '';
+            
+            // Remove "Process For AI" button if present
+            updatedDesc = updatedDesc.replace(/\n\n---\n\n\*\*\[Process For AI\]\([^)]+\)\*\*/g, '');
+            updatedDesc = updatedDesc.replace(/^\*\*\[Process For AI\]\([^)]+\)\*\*\n\n---\n\n/, '');
+            // Remove existing "Generate Article" button if present (to avoid duplicates)
+            updatedDesc = updatedDesc.replace(/\n\n---\n\n\*\*\[Generate Article\]\([^)]+\)\*\*/g, '');
+            updatedDesc = updatedDesc.replace(/^\*\*\[Generate Article\]\([^)]+\)\*\*\n\n---\n\n/, '');
+            
+            // Remove any scraping error messages
+            updatedDesc = updatedDesc.replace(/\n\n---\n\n## ⚠️ Scraping Failed[\s\S]*?(?=\n\n---|$)/, '');
+            
+            // Add "Generate Article" button at the top
+            updatedDesc = `**[Generate Article](${generateArticleUrl})**\n\n---\n\n${updatedDesc.trim()}`;
+            
+            // Store scraped data in HTML comment (hidden)
+            updatedDesc += `\n\n<!-- PR_DATA:${scrapedDataBase64} -->`;
+            
+            // Update card description
+            await trello.updateCardDescription(cardId, updatedDesc);
+            
+            // Store in memory for quick access
+            if (!trelloCardToPR) {
+              trelloCardToPR = new Map();
+            }
+            trelloCardToPR.set(cardId, scrapedData);
+            
+            console.log(`   ✅ Card processed successfully. Ready for article generation.`);
+            console.log(`   🔗 URL: ${articleUrl}`);
+            console.log(`   📄 Scraped content length: ${scrapedText.length} chars`);
+            
+            return; // Exit early for news ingestion cards
+          } catch (scrapeError: any) {
+            console.error(`   ❌ Scraping failed:`, scrapeError.message);
+            
+            // Update card with scraping failure notification
+            const baseUrl = process.env.APP_URL || 'http://localhost:3001';
+            let updatedDesc = card.desc || '';
+            
+            // Remove "Process For AI" button if present
+            updatedDesc = updatedDesc.replace(/\n\n---\n\n\*\*\[Process For AI\]\([^)]+\)\*\*/g, '');
+            updatedDesc = updatedDesc.replace(/^\*\*\[Process For AI\]\([^)]+\)\*\*\n\n---\n\n/, '');
+            // Remove existing error messages to avoid duplicates
+            updatedDesc = updatedDesc.replace(/\n\n---\n\n## ⚠️ Scraping Failed[\s\S]*?(?=\n\n---|$)/, '');
+            
+            // Add scraping failure notification
+            updatedDesc += `\n\n---\n\n## ⚠️ Scraping Failed\n\n`;
+            updatedDesc += `The article could not be automatically scraped from the URL.\n\n`;
+            updatedDesc += `**To proceed, please:**\n`;
+            updatedDesc += `1. Copy the full article text from the source URL\n`;
+            updatedDesc += `2. Paste it in the "Article Text" field below\n`;
+            updatedDesc += `3. Click "Process For AI" again (or "Generate Article" if button appears)\n\n`;
+            updatedDesc += `**Article Text:**\n\n`;
+            updatedDesc += `*(Paste the full article text here)*\n\n`;
+            
+            await trello.updateCardDescription(cardId, updatedDesc);
+            console.log(`   ✅ Updated card with scraping failure notification and manual text field`);
+            
+            return; // Exit early after handling scraping failure
+          }
+        }
+        
+        // For PR and WGO cards, existing behavior (no scraping needed - they already have content)
         // No need to fetch from Benzinga API - the URL is already in the description
         // The "Generate Article" endpoint will fetch the article when needed
         console.log(`   ℹ️  URL found in description - skipping API fetch`);
@@ -1871,9 +1984,12 @@ app.get("/trello/process-card/:cardId", async (req, res) => {
         
         // Remove "Process For AI" button if present
         updatedDesc = updatedDesc.replace(/\n\n---\n\n\*\*\[Process For AI\]\([^)]+\)\*\*/g, '');
+        // Remove existing "Generate Article" button if present (to avoid duplicates)
+        updatedDesc = updatedDesc.replace(/\n\n---\n\n\*\*\[Generate Article\]\([^)]+\)\*\*/g, '');
+        updatedDesc = updatedDesc.replace(/^\*\*\[Generate Article\]\([^)]+\)\*\*\n\n---\n\n/, '');
         
-        // Add "Generate Article" button
-        updatedDesc += `\n\n---\n\n**[Generate Article](${generateArticleUrl})**`;
+        // Add "Generate Article" button at the top
+        updatedDesc = `**[Generate Article](${generateArticleUrl})**\n\n---\n\n${updatedDesc.trim()}`;
         
         // Update card description
         await trello.updateCardDescription(cardId, updatedDesc);
