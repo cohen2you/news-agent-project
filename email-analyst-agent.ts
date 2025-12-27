@@ -12,6 +12,7 @@ import {
 } from "@langchain/langgraph";
 import { EmailService, EmailFilter } from "./email-service";
 import { TrelloService } from "./trello-service";
+import { formatPubDate } from "./date-utils";
 import { extractPDFText } from "./analyst-tools-integration";
 
 // Email Analyst Agent State
@@ -428,6 +429,12 @@ const trelloCardCreationNode = async (state: typeof EmailAnalystAgentState.State
         if (note.ticker) {
           title = `${note.ticker}... ${title}`;
         }
+        
+        // Format date and add timestamp prefix to title
+        const noteDate = note.date || new Date();
+        const datePrefix = formatPubDate(noteDate);
+        title = `${datePrefix} ${title}`;
+        
         console.log(`      📋 Card title: ${title.substring(0, 60)}...`);
 
         // Build card description

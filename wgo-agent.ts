@@ -10,6 +10,7 @@ import {
 import { generatePitchFromBenzinga } from "./benzinga-api";
 import { generateArticle } from "./article-generator-integration";
 import { TrelloService } from "./trello-service";
+import { formatPubDate } from "./date-utils";
 
 // WGO Agent State - specifically for WGO/WIIM stories
 const WGOAgentState = Annotation.Root({
@@ -214,10 +215,17 @@ const wgoTrelloPitchNode = async (state: typeof WGOAgentState.State) => {
         // Extract headline from article title
         let headline = article.title || article.headline || state.topic || 'Untitled WGO Story';
         
+        // Format date and add timestamp prefix to headline
+        const articleDate = article.created ? new Date(article.created * 1000) : new Date();
+        const datePrefix = formatPubDate(articleDate);
+        
         // Add ticker prefix to headline if ticker exists (format: "TICKER... (rest of title)")
         if (ticker) {
           headline = `${ticker}... ${headline}`;
         }
+        
+        // Prepend date timestamp to headline
+        headline = `${datePrefix} ${headline}`;
         
         // Build summary from article
         const summary = article.teaser || (article.body ? article.body.substring(0, 500) : 'No summary available');

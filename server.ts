@@ -5201,6 +5201,12 @@ async function runAutoScan(initialLoad: boolean = false) {
           title = `${articleTicker}... ${title}`;
         }
         
+        // Format date and add timestamp prefix to title
+        const { formatPubDate } = await import("./date-utils");
+        const articleDate = article.created ? new Date(article.created * 1000) : new Date();
+        const datePrefix = formatPubDate(articleDate);
+        title = `${datePrefix} ${title}`;
+        
         const body = article.body || article.teaser || '';
         const summary = article.teaser || (body ? body.substring(0, 500) : 'No summary available');
         
@@ -7388,6 +7394,14 @@ async function runPRAutoScan(initialLoad: boolean = false) {
         if (prTicker) {
           title = `${prTicker}... ${prTitle}`;
         }
+        
+        // Format date and add timestamp prefix to title
+        const { formatPubDate } = await import("./date-utils");
+        const prDate = pr.created 
+          ? (pr.created > 1000000000000 ? new Date(pr.created) : new Date(pr.created * 1000))
+          : new Date();
+        const datePrefix = formatPubDate(prDate);
+        title = `${datePrefix} ${title}`;
         
         const body = pr.body || pr.teaser || '';
         const summary = pr.teaser || (body ? body.substring(0, 500) : 'No summary available');
