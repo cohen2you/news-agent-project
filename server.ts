@@ -1647,13 +1647,15 @@ app.get("/trello/process-card/:cardId", async (req, res) => {
     const economyListId = process.env.TRELLO_LIST_ID_ECONOMY;
     const commoditiesListId = process.env.TRELLO_LIST_ID_COMMODITIES;
     const hedgeFundsListId = process.env.TRELLO_LIST_ID_HEDGE_FUNDS;
+    const techListId = process.env.TRELLO_LIST_ID_TECH;
     
     const isPRList = prListId && listId === prListId;
     const isWGOList = wgoListId && listId === wgoListId;
     const isNewsIngestionList = (marketsListId && listId === marketsListId) ||
                                  (economyListId && listId === economyListId) ||
                                  (commoditiesListId && listId === commoditiesListId) ||
-                                 (hedgeFundsListId && listId === hedgeFundsListId);
+                                 (hedgeFundsListId && listId === hedgeFundsListId) ||
+                                 (techListId && listId === techListId);
     
     if (!isPRList && !isWGOList && !isNewsIngestionList) {
       const errorHtml = `
@@ -1682,7 +1684,7 @@ app.get("/trello/process-card/:cardId", async (req, res) => {
 <body>
     <div class="message">
         <h2>❌ Error</h2>
-        <p>This card is not in a supported list (PR-Related Stories, WGO/WIIM Stories, Markets, Economy, Commodities, or Hedge Funds).</p>
+        <p>This card is not in a supported list (PR-Related Stories, WGO/WIIM Stories, Markets, Economy, Commodities, Hedge Funds, or Tech & AI).</p>
         <p>Please move the card to one of these lists before processing.</p>
         <button onclick="window.close()" style="margin-top: 20px; padding: 10px 20px; cursor: pointer;">Close</button>
     </div>
