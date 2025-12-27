@@ -2092,10 +2092,39 @@ app.get("/trello/process-card/:cardId", async (req, res) => {
             
             console.log(`   ✅ Successfully scraped article (${scrapedText.length} chars)`);
             
+            // CRITICAL: Re-extract Source URL field to ensure we use ONLY the authoritative URL
+            // This ensures we use the URL from "Source URL:" field, not any URLs in scraped content
+            let authoritativeUrl = articleUrl;
+            const sourceUrlFieldPattern = /\*\*Source URL:\*\*\s*\n?\s*(https?:\/\/[^\s\n]+)/i;
+            const sourceUrlFieldMatch = (card.desc || '').match(sourceUrlFieldPattern);
+            if (sourceUrlFieldMatch) {
+              const matchedUrl = sourceUrlFieldMatch[1].trim();
+              // Check if it's an internal URL (should skip those)
+              const isInternalUrlCheck = (url: string): boolean => {
+                const internalPatterns = [
+                  /localhost:3001/,
+                  /\/trello\/process-card\//,
+                  /\/trello\/generate-article\//,
+                  /\/analyst-story\/generate\//,
+                  /\/editor\//,
+                  /\/trello\/add-process-buttons\//
+                ];
+                return internalPatterns.some(pattern => pattern.test(url));
+              };
+              if (!isInternalUrlCheck(matchedUrl)) {
+                authoritativeUrl = matchedUrl;
+                console.log(`   ✅ Using authoritative Source URL field: ${authoritativeUrl}`);
+              } else {
+                console.log(`   ⚠️  Source URL field contains internal URL, using extracted URL: ${articleUrl}`);
+              }
+            } else {
+              console.log(`   ⚠️  Source URL field not found, using extracted URL: ${articleUrl}`);
+            }
+            
             // Store scraped content in card description (hidden in HTML comment)
             const scrapedData = {
               title: card.name,
-              url: articleUrl,
+              url: authoritativeUrl, // Use authoritative Source URL field exclusively
               body: scrapedText,
               content: scrapedText,
               teaser: scrapedText.substring(0, 500),
@@ -2767,11 +2796,40 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
               ticker = titleMatch[1].toUpperCase();
             }
             
+            // CRITICAL: Re-extract Source URL field to ensure we use ONLY the authoritative URL
+            // Ignore any URLs that might be in the pasted article text
+            let authoritativeUrl = cardDescriptionUrl;
+            const sourceUrlFieldPattern = /\*\*Source URL:\*\*\s*\n?\s*(https?:\/\/[^\s\n]+)/i;
+            const sourceUrlFieldMatch = (cardData.desc || '').match(sourceUrlFieldPattern);
+            if (sourceUrlFieldMatch) {
+              const matchedUrl = sourceUrlFieldMatch[1].trim();
+              // Check if it's an internal URL (should skip those)
+              const isInternalUrlCheck = (url: string): boolean => {
+                const internalPatterns = [
+                  /localhost:3001/,
+                  /\/trello\/process-card\//,
+                  /\/trello\/generate-article\//,
+                  /\/analyst-story\/generate\//,
+                  /\/editor\//,
+                  /\/trello\/add-process-buttons\//
+                ];
+                return internalPatterns.some(pattern => pattern.test(url));
+              };
+              if (!isInternalUrlCheck(matchedUrl)) {
+                authoritativeUrl = matchedUrl;
+                console.log(`   ✅ Using authoritative Source URL field: ${authoritativeUrl}`);
+              } else {
+                console.log(`   ⚠️  Source URL field contains internal URL, using extracted URL: ${cardDescriptionUrl}`);
+              }
+            } else {
+              console.log(`   ⚠️  Source URL field not found, using extracted URL: ${cardDescriptionUrl}`);
+            }
+            
             sourceData = {
-              id: cardDescriptionUrl!.split('/').pop() || 'unknown',
+              id: authoritativeUrl!.split('/').pop() || 'unknown',
               title: cardTitle,
               headline: cardTitle,
-              url: cardDescriptionUrl!,
+              url: authoritativeUrl!, // Use authoritative Source URL field exclusively
               body: pastedArticleText, // Use pasted text as body
               teaser: pastedArticleText.substring(0, 500),
               content: pastedArticleText,
@@ -2785,7 +2843,7 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
             
             console.log(`   ✅ Created source data from manually pasted article text`);
             console.log(`      Title: ${cardTitle}`);
-            console.log(`      URL: ${cardDescriptionUrl}`);
+            console.log(`      URL (from Source URL field): ${authoritativeUrl}`);
             console.log(`      Body length: ${pastedArticleText.length} chars`);
             if (ticker) {
               console.log(`      Ticker: ${ticker}`);
