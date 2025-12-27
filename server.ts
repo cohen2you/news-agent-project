@@ -1598,7 +1598,22 @@ app.post("/trello/webhook", async (req, res) => {
       
       // For news ingestion lists: Check if article text has been pasted (user added content after scraping failure)
       // Look for "Article Text:" field with actual content (not just placeholder text)
-      const articleTextMatch = cardDesc.match(/\*\*Article Text:\*\*\s*\n\n(.*?)(?=\n\n---|\n\n\*\*|$)/is);
+      // Use a more flexible regex that handles various formats
+      const articleTextPatterns = [
+        /\*\*Article Text:\*\*\s*\n\n([\s\S]*?)(?=\n\n---\n\n##|$)/i,  // Match until "---\n\n##" (scraping failed section)
+        /\*\*Article Text:\*\*\s*\n\n([\s\S]*?)(?=\n\n\*\*|$)/i,        // Match until next ** field
+        /\*\*Article Text:\*\*\s*\n([\s\S]*?)(?=\n\n---|$)/i            // More flexible match with single newline
+      ];
+      
+      let articleTextMatch: RegExpMatchArray | null = null;
+      for (const pattern of articleTextPatterns) {
+        const match = cardDesc.match(pattern);
+        if (match && match[1] && match[1].trim().length > 50) {
+          articleTextMatch = match;
+          break;
+        }
+      }
+      
       const hasArticleText = articleTextMatch && 
                              articleTextMatch[1] && 
                              articleTextMatch[1].trim().length > 50 && // At least 50 chars of actual content
@@ -1902,8 +1917,22 @@ app.get("/trello/process-card/:cardId", async (req, res) => {
           console.log(`   🌐 News ingestion card detected - checking for article text...`);
           
           // First, check if user has manually pasted article text in the "Article Text:" field
-          const articleTextPattern = /\*\*Article Text:\*\*\s*\n\n(.*?)(?=\n\n---|\n\n\*\*|$)/is;
-          const articleTextMatch = card.desc.match(articleTextPattern);
+          // Use flexible patterns to match various formats
+          const articleTextPatterns = [
+            /\*\*Article Text:\*\*\s*\n\n([\s\S]*?)(?=\n\n---\n\n##|$)/i,  // Match until "---\n\n##" (scraping failed section)
+            /\*\*Article Text:\*\*\s*\n\n([\s\S]*?)(?=\n\n\*\*|$)/i,        // Match until next ** field
+            /\*\*Article Text:\*\*\s*\n([\s\S]*?)(?=\n\n---|$)/i            // More flexible match with single newline
+          ];
+          
+          let articleTextMatch: RegExpMatchArray | null = null;
+          for (const pattern of articleTextPatterns) {
+            const match = card.desc.match(pattern);
+            if (match && match[1] && match[1].trim().length > 50) {
+              articleTextMatch = match;
+              break;
+            }
+          }
+          
           const manualArticleText = articleTextMatch && 
                                     articleTextMatch[1] && 
                                     articleTextMatch[1].trim().length > 50 && // At least 50 chars
