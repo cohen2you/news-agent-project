@@ -184,37 +184,41 @@ export async function runNewsCycle(): Promise<void> {
         totalProcessed++;
         
         const cleanUrl = item.link || item.guid || '';
-        const title = item.title || 'Untitled Article';
+        const originalTitle = item.title || 'Untitled Article';
         const content = item.contentSnippet || item.content || '';
         
         // Skip if no URL or title
-        if (!cleanUrl || !title) {
+        if (!cleanUrl || !originalTitle) {
           console.log(`   ⚠️  Skipping article without URL or title`);
           totalSkipped++;
           continue;
         }
         
-        // Check if already processed (by title to avoid duplicates from different feeds)
-        if (processedTitles.has(title)) {
-          console.log(`   ⏭️  Already processed (duplicate title): "${title.substring(0, 50)}..."`);
+        // Format the date and prepend to title
+        const datePrefix = formatPubDate(item.pubDate || item.isoDate);
+        const title = `${datePrefix} ${originalTitle}`;
+        
+        // Check if already processed (by original title to avoid duplicates from different feeds)
+        if (processedTitles.has(originalTitle)) {
+          console.log(`   ⏭️  Already processed (duplicate title): "${originalTitle.substring(0, 50)}..."`);
           totalSkipped++;
           continue;
         }
         
         // Also check URL for duplicates
         if (isAlreadyProcessed(cleanUrl)) {
-          console.log(`   ⏭️  Already processed (duplicate URL): "${title.substring(0, 50)}..."`);
+          console.log(`   ⏭️  Already processed (duplicate URL): "${originalTitle.substring(0, 50)}..."`);
           totalSkipped++;
           continue;
         }
         
-        // Route based on Feed Name AND Content
-        const targetListId = routeArticle(feed.name, title, content);
+        // Route based on Feed Name AND Content (use original title for routing)
+        const targetListId = routeArticle(feed.name, originalTitle, content);
         
         if (!targetListId) {
-          console.log(`   ⚠️  No valid list ID found for: "${title.substring(0, 50)}..."`);
+          console.log(`   ⚠️  No valid list ID found for: "${originalTitle.substring(0, 50)}..."`);
           console.log(`   ⚠️  Check that TRELLO_LIST_ID_MARKETS, TRELLO_LIST_ID_ECONOMY, TRELLO_LIST_ID_COMMODITIES, TRELLO_LIST_ID_HEDGE_FUNDS, and TRELLO_LIST_ID_TECH are set in environment variables`);
-          processedTitles.add(title);
+          processedTitles.add(originalTitle);
           markAsProcessed(cleanUrl);
           totalSkipped++;
           continue;
@@ -236,9 +240,10 @@ export async function runNewsCycle(): Promise<void> {
           const baseUrl = process.env.APP_URL || 'http://localhost:3001';
           
           // First create card to get the card ID, then build full description
+          // Use the formatted title with date prefix
           const tempCard = await trello.createCard(
             targetListId,
-            title,
+            title, // Title includes date prefix: "[Dec 27 2:30 PM] Original Title"
             '' // Create with empty description first to get card ID
           );
           
