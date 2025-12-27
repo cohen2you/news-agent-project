@@ -1991,13 +1991,30 @@ app.get("/trello/process-card/:cardId", async (req, res) => {
             updatedDesc = updatedDesc.replace(/\n\n---\n\n\*\*\[Generate Article\]\([^)]+\)\*\*/g, '');
             updatedDesc = updatedDesc.replace(/^\*\*\[Generate Article\]\([^)]+\)\*\*\n\n---\n\n/, '');
             
-            // Remove scraping error messages
-            updatedDesc = updatedDesc.replace(/\n\n---\n\n## ⚠️ Scraping Failed[\s\S]*?(?=\n\n---|\*\*Article Text:)/, '');
+            // Remove scraping error messages and the "Article Text:" field (we're storing it in PR_DATA)
+            updatedDesc = updatedDesc.replace(/\n\n---\n\n## ⚠️ Scraping Failed[\s\S]*?(?=\n\n---|$)/, '');
+            // Remove the Article Text field (including the full text that was pasted)
+            updatedDesc = updatedDesc.replace(/\n\n\*\*Article Text:\*\*\s*\n\n[\s\S]*?(?=\n\n---|$)/, '');
+            
+            // Keep only Source URL and Article Summary (if present)
+            // Extract Source URL
+            const sourceUrlMatch = updatedDesc.match(/\*\*Source URL:\*\*\s*\n?\s*(https?:\/\/[^\s\n]+)/i);
+            const sourceUrl = sourceUrlMatch ? sourceUrlMatch[1] : articleUrl;
+            
+            // Extract Article Summary (if present)
+            const summaryMatch = updatedDesc.match(/\*\*Article Summary:\*\*\s*\n([\s\S]*?)(?=\n\n---|$)/i);
+            const summary = summaryMatch ? summaryMatch[1].trim() : '';
+            
+            // Build clean description
+            updatedDesc = `**Source URL:** ${sourceUrl}`;
+            if (summary) {
+              updatedDesc += `\n\n**Article Summary:**\n${summary}`;
+            }
             
             // Add "Generate Article" button at the top
             updatedDesc = `**[Generate Article](${generateArticleUrl})**\n\n---\n\n${updatedDesc.trim()}`;
             
-            // Store article text in HTML comment (hidden)
+            // Store article text in HTML comment (hidden) - this is what the generator will use
             updatedDesc += `\n\n<!-- PR_DATA:${scrapedDataBase64} -->`;
             
             // Update card description
