@@ -2574,13 +2574,34 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
         // Try to find URL in description - use comprehensive extraction
         console.log(`   🔍 Extracting URL from card description (length: ${cardData.desc?.length || 0})...`);
         
+        // Helper function to filter out image URLs (static domains, image paths, image file extensions)
+        const isImageUrl = (url: string): boolean => {
+          const imagePatterns = [
+            /\/images?\//i,
+            /\/image\//i,
+            /\/img\//i,
+            /\/assets\//i,
+            /\/media\//i,
+            /static\d+/i,
+            /cdn/i,
+            /\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?|$)/i,
+          ];
+          return imagePatterns.some(pattern => pattern.test(url));
+        };
+        
         // Pattern 1: **Source URL:** format (for news ingestion cards)
         // Handles both same-line and next-line URLs
         const sourceUrlPattern = /\*\*Source URL:\*\*\s*\n?\s*(https?:\/\/[^\s\n]+)/i;
         const sourceUrlMatch = (cardData.desc || '').match(sourceUrlPattern);
         if (sourceUrlMatch && !isInternalUrl(sourceUrlMatch[1])) {
-          cardDescriptionUrl = sourceUrlMatch[1].trim();
-          console.log(`   ✅ Found URL in Source URL format: ${cardDescriptionUrl}`);
+          const matchedUrl = sourceUrlMatch[1].trim();
+          // Check if it's an image URL - if so, try to find a better URL in the description
+          if (!isImageUrl(matchedUrl)) {
+            cardDescriptionUrl = matchedUrl;
+            console.log(`   ✅ Found URL in Source URL format: ${cardDescriptionUrl}`);
+          } else {
+            console.warn(`   ⚠️  Source URL format contains image URL, will try other patterns: ${matchedUrl}`);
+          }
         }
         
         // Pattern 1b: **Source URL:** with URL on a separate line (more flexible)
@@ -2588,26 +2609,39 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
           const sourceUrlMultilinePattern = /\*\*Source URL:\*\*\s*\n\s*(https?:\/\/[^\s\n]+)/i;
           const sourceUrlMultilineMatch = (cardData.desc || '').match(sourceUrlMultilinePattern);
           if (sourceUrlMultilineMatch && !isInternalUrl(sourceUrlMultilineMatch[1])) {
-            cardDescriptionUrl = sourceUrlMultilineMatch[1].trim();
-            console.log(`   ✅ Found URL in Source URL format (multiline): ${cardDescriptionUrl}`);
+            const matchedUrl = sourceUrlMultilineMatch[1].trim();
+            // Check if it's an image URL - if so, skip and try other patterns
+            if (!isImageUrl(matchedUrl)) {
+              cardDescriptionUrl = matchedUrl;
+              console.log(`   ✅ Found URL in Source URL format (multiline): ${cardDescriptionUrl}`);
+            } else {
+              console.warn(`   ⚠️  Source URL multiline format contains image URL, will try other patterns: ${matchedUrl}`);
+            }
           }
         }
         
         // Pattern 2: Markdown links [text](url) - prioritize Benzinga URLs, but accept any if no Benzinga found
         if (!cardDescriptionUrl) {
           const allMarkdownLinks = [...(cardData.desc || '').matchAll(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g)];
-          const benzingaLink = allMarkdownLinks.find(match => 
-            match[2].includes('benzinga.com') && !isInternalUrl(match[2])
-          );
+          const externalLinks = allMarkdownLinks
+            .map(match => match[2])
+            .filter(url => !isInternalUrl(url));
+          
+          // Prioritize Benzinga URLs, then article URLs (non-image), then fallback to any external URL
+          const benzingaLink = externalLinks.find(url => url.includes('benzinga.com'));
           if (benzingaLink) {
-            cardDescriptionUrl = benzingaLink[2];
+            cardDescriptionUrl = benzingaLink;
             console.log(`   ✅ Found Benzinga URL in markdown link: ${cardDescriptionUrl}`);
-          } else if (allMarkdownLinks.length > 0) {
-            // Use first non-internal markdown link if no Benzinga link found
-            const firstExternalLink = allMarkdownLinks.find(match => !isInternalUrl(match[2]));
-            if (firstExternalLink) {
-              cardDescriptionUrl = firstExternalLink[2];
-              console.log(`   ✅ Found URL in markdown link: ${cardDescriptionUrl}`);
+          } else {
+            // Filter out image URLs and prioritize article URLs
+            const articleLinks = externalLinks.filter(url => !isImageUrl(url));
+            if (articleLinks.length > 0) {
+              cardDescriptionUrl = articleLinks[0];
+              console.log(`   ✅ Found article URL in markdown link: ${cardDescriptionUrl}`);
+            } else if (externalLinks.length > 0) {
+              // Fallback: use first external link even if it's an image (should rarely happen)
+              console.warn(`   ⚠️  Only image URLs found in markdown links, using first one: ${externalLinks[0]}`);
+              cardDescriptionUrl = externalLinks[0];
             }
           }
         }
