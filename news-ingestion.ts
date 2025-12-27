@@ -93,6 +93,11 @@ function routeArticle(feedName: string, title: string, snippet: string): string 
   if (feedName.includes("ValueWalk") || feedName.includes("Insider") || feedName.includes("Dealbreaker")) {
     return LIST_IDS.HEDGE_FUNDS;
   }
+  
+  // Route Nasdaq & AlphaStreet to Markets (AlphaStreet is great for Earnings coverage)
+  if (feedName.includes("Nasdaq") || feedName.includes("AlphaStreet")) {
+    return LIST_IDS.MARKETS;
+  }
 
   // B. Specific Personality Routing
   
