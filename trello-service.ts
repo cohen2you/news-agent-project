@@ -501,17 +501,20 @@ export class TrelloService {
           desc.indexOf('<!-- NOTE_DATA:'),
           desc.indexOf('```metadata')
         );
-        const mainDesc = metadataIndex > 0 ? desc.substring(0, metadataIndex) : desc;
+        // Remove generateArticleButton from desc if it's already there (to calculate correctly)
+        const descWithoutButton = desc.replace(/^\*\*\[Generate Article\]\([^)]+\)\*\*\n\n---\n\n/, '');
+        const mainDesc = metadataIndex > 0 ? descWithoutButton.substring(0, metadataIndex) : descWithoutButton;
         if (availableLength > 0) {
-          desc = mainDesc.substring(0, availableLength) + additionalInfoText + linksText + prDataBlock;
+          desc = generateArticleButton + mainDesc.substring(0, availableLength) + additionalInfoText + linksText + prDataBlock;
         } else {
           // If even PR data makes it too long, just use essential parts
-          desc = desc.substring(0, 11000) + '...' + linksText + prDataBlock;
+          desc = generateArticleButton + mainDesc.substring(0, 11000) + '...' + linksText + prDataBlock;
         }
       } else {
-        // No PR data, just truncate main description
-        const truncateAt = 12000 - additionalInfoText.length - linksText.length - 10;
-        desc = desc.substring(0, truncateAt) + '...' + additionalInfoText + linksText;
+        // No PR data, just truncate main description (remove button first to calculate correctly)
+        const descWithoutButton = desc.replace(/^\*\*\[Generate Article\]\([^)]+\)\*\*\n\n---\n\n/, '');
+        const truncateAt = 12000 - generateArticleButton.length - additionalInfoText.length - linksText.length - 10;
+        desc = generateArticleButton + descWithoutButton.substring(0, truncateAt) + '...' + additionalInfoText + linksText;
       }
     }
     
