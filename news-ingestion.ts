@@ -14,37 +14,33 @@ const parser = new Parser({
   }
 });
 
-// --- THE ULTIMATE FEED LIST (20 Sources) ---
+// --- THE WORKING FEED LIST (Cleaned of Blocks & Broken Feeds) ---
 const FEEDS = [
-  // 1. MARKETS (Broad Coverage)
+  // 1. MARKETS (Reliable & Fast)
   { name: "CNBC Markets", url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664' },
   { name: "Business Insider", url: 'https://markets.businessinsider.com/rss/news' },
   { name: "Yahoo Finance Top", url: 'https://finance.yahoo.com/news/rssindex' },
-  { name: "Seeking Alpha Market News", url: 'https://seekingalpha.com/market_news/feed' },
+  { name: "Fortune Finance", url: 'https://fortune.com/feed/finance' },
 
   // 2. ECONOMY & MACRO
   { name: "CNBC Economy", url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258' },
   { name: "MarketWatch Top Stories", url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories' },
-  { name: "Bing: Fed & Rates", url: 'https://www.bing.com/news/search?q="Jerome+Powell"+OR+"Fed+Rate"+OR+"CPI"+OR+"Inflation"+OR+"Recession"&format=rss' },
 
-  // 3. COMMODITIES
+  // 3. COMMODITIES (Replaced Kitco with reliable alternatives)
   { name: "Investing.com Commodities", url: 'https://www.investing.com/rss/commodities.rss' },
   { name: "OilPrice.com", url: 'https://oilprice.com/rss/main' },
-  { name: "Kitco Gold", url: 'https://www.kitco.com/rss/category/news' },
 
-  // 4. TECH, AI & CRYPTO
+  // 4. TECH, AI & CRYPTO (Working perfectly based on logs)
   { name: "TechCrunch", url: 'https://techcrunch.com/feed/' },
   { name: "The Verge", url: 'https://www.theverge.com/rss/index.xml' },
-  { name: "Bing: AI & Chips", url: 'https://www.bing.com/news/search?q="Nvidia"+OR+"OpenAI"+OR+"Sam+Altman"+OR+"TSMC"+OR+"Artificial+Intelligence"&format=rss' },
 
-  // 5. HEDGE FUNDS & INVESTOR TITANS
-  // Tracks: Ackman, Dalio, Griffin, Tepper, Icahn, Druckenmiller... AND BUFFETT
-  { name: "Bing: Investor Titans", url: 'https://www.bing.com/news/search?q="Bill+Ackman"+OR+"Ray+Dalio"+OR+"Ken+Griffin"+OR+"Carl+Icahn"+OR+"Warren+Buffett"+OR+"Berkshire+Hathaway"&format=rss' },
-  { name: "Opalesque", url: 'https://www.opalesque.com/rss' },
-
-  // 6. MARKET MOVERS (CEOs/Personalities)
-  // Tracks: Musk, Dimon, Cathie Wood
-  { name: "Bing: CEOs", url: 'https://www.bing.com/news/search?q="Elon+Musk"+OR+"Jamie+Dimon"+OR+"Cathie+Wood"+OR+"Michael+Burry"&format=rss' }
+  // 5. HEDGE FUNDS (The New "Rescue" List - Replaces blocked Bing & broken Opalesque)
+  // ValueWalk: Excellent for value investing & hedge fund letters
+  { name: "ValueWalk", url: 'https://www.valuewalk.com/feed/' },
+  // Insider Monkey: Tracks 13F filings and insider buying
+  { name: "Insider Monkey", url: 'https://www.insidermonkey.com/blog/feed/' },
+  // Dealbreaker: Wall St culture and hedge fund gossip
+  { name: "Dealbreaker", url: 'https://dealbreaker.com/.rss/full/' }
 ];
 
 // Define List IDs (From your .env)
@@ -82,13 +78,15 @@ function formatPubDate(isoDateString?: string): string {
 function routeArticle(feedName: string, title: string, snippet: string): string {
   const text = (title + " " + snippet).toLowerCase();
   
-  // A. Feed Name Overrides
+  // A. Feed Name Overrides (Fastest Sorting)
   if (feedName.includes("Economy")) return LIST_IDS.ECONOMY;
-  if (feedName.includes("Commodities") || feedName.includes("Oil") || feedName.includes("Gold")) return LIST_IDS.COMMODITIES;
-  if (feedName.includes("Tech") || feedName.includes("AI")) return LIST_IDS.TECH;
+  if (feedName.includes("Commodities") || feedName.includes("Oil")) return LIST_IDS.COMMODITIES;
+  if (feedName.includes("Tech") || feedName.includes("Verge")) return LIST_IDS.TECH;
   
-  // Send Investor Titans feed straight to Hedge Funds
-  if (feedName.includes("Investor Titans") || feedName.includes("Hedge Fund")) return LIST_IDS.HEDGE_FUNDS;
+  // Route the new Hedge Fund feeds directly
+  if (feedName.includes("ValueWalk") || feedName.includes("Insider Monkey") || feedName.includes("Dealbreaker")) {
+    return LIST_IDS.HEDGE_FUNDS;
+  }
 
   // B. Specific Personality Routing
   
@@ -166,16 +164,32 @@ export async function runNewsCycle(): Promise<void> {
       const response = await axios.get(feed.url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept': 'application/rss+xml, application/xml, text/xml, */*',
           'Accept-Language': 'en-US,en;q=0.9'
         },
-        timeout: 8000
+        timeout: 8000,
+        maxRedirects: 5
       });
+
+      // Log response status for debugging
+      if (response.status !== 200) {
+        console.log(`   ⚠️  Feed returned status ${response.status}`);
+      }
+
+      // Check if response looks like RSS/XML
+      const contentType = response.headers['content-type'] || '';
+      if (!contentType.includes('xml') && !contentType.includes('rss')) {
+        console.log(`   ⚠️  Unexpected content type: ${contentType}`);
+      }
 
       const feedData = await parser.parseString(response.data);
       const items = feedData.items || [];
       
-      console.log(`   ✅ Found ${items.length} article(s) in feed`);
+      if (items.length === 0) {
+        console.log(`   ⚠️  Feed parsed successfully but returned 0 items (feed name: ${feedData.title || 'N/A'})`);
+      } else {
+        console.log(`   ✅ Found ${items.length} article(s) in feed`);
+      }
       
       // Only grab top 2 items per feed to avoid spamming the board
       const latestItems = items.slice(0, 2);
@@ -285,6 +299,12 @@ export async function runNewsCycle(): Promise<void> {
       
     } catch (error: any) {
       console.error(`   ❌ Failed to fetch "${feed.name}": ${error.message}`);
+      if (error.response) {
+        console.error(`      Status: ${error.response.status}, StatusText: ${error.response.statusText}`);
+      }
+      if (error.code) {
+        console.error(`      Error code: ${error.code}`);
+      }
       // Continue with next feed even if one fails
     }
   }
