@@ -59,19 +59,37 @@ function formatPubDate(isoDateString?: string): string {
 
   const date = new Date(isoDateString);
   
-  // Format: "Dec 27 2:30 PM"
-  // Note: On Render server, this will likely be UTC. 
-  // If you want strict EST, you can subtract 5 hours or use specific timezone logic.
-  const month = date.toLocaleString('en-US', { month: 'short' });
-  const day = date.getDate();
-  let hour = date.getHours();
-  const minute = date.getMinutes().toString().padStart(2, '0');
-  const ampm = hour >= 12 ? 'PM' : 'AM';
+  // Format: "Dec 27 2:30 PM" in EST/EDT (America/New_York timezone)
+  // Using toLocaleString with timezone option to handle EST/EDT automatically
+  const month = date.toLocaleString('en-US', { 
+    timeZone: 'America/New_York',
+    month: 'short' 
+  });
+  const day = date.toLocaleString('en-US', { 
+    timeZone: 'America/New_York',
+    day: 'numeric' 
+  });
+  const hour = parseInt(date.toLocaleString('en-US', { 
+    timeZone: 'America/New_York',
+    hour: 'numeric',
+    hour12: false 
+  }));
+  const minute = date.toLocaleString('en-US', { 
+    timeZone: 'America/New_York',
+    minute: '2-digit' 
+  });
+  const ampm = date.toLocaleString('en-US', { 
+    timeZone: 'America/New_York',
+    hour: 'numeric',
+    hour12: true 
+  }).split(' ')[1]; // Extract "AM" or "PM"
   
-  hour = hour % 12;
-  hour = hour ? hour : 12; // the hour '0' should be '12'
+  // Convert 24-hour to 12-hour format
+  let hour12 = hour % 12;
+  hour12 = hour12 ? hour12 : 12; // the hour '0' should be '12'
+  const minutePadded = minute.padStart(2, '0');
 
-  return `[${month} ${day} ${hour}:${minute} ${ampm}]`;
+  return `[${month} ${day} ${hour12}:${minutePadded} ${ampm}]`;
 }
 
 // Smart Router Logic
