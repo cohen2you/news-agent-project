@@ -57,6 +57,27 @@ const LIST_IDS = {
   DEFAULT: process.env.TRELLO_LIST_ID || ''
 };
 
+// --- HELPER: FORMAT DATE ---
+function formatPubDate(isoDateString?: string): string {
+  if (!isoDateString) return "[New]"; // Fallback if no date provided
+
+  const date = new Date(isoDateString);
+  
+  // Format: "Dec 27 2:30 PM"
+  // Note: On Render server, this will likely be UTC. 
+  // If you want strict EST, you can subtract 5 hours or use specific timezone logic.
+  const month = date.toLocaleString('en-US', { month: 'short' });
+  const day = date.getDate();
+  let hour = date.getHours();
+  const minute = date.getMinutes().toString().padStart(2, '0');
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  
+  hour = hour % 12;
+  hour = hour ? hour : 12; // the hour '0' should be '12'
+
+  return `[${month} ${day} ${hour}:${minute} ${ampm}]`;
+}
+
 // Smart Router Logic
 function routeArticle(feedName: string, title: string, snippet: string): string {
   const text = (title + " " + snippet).toLowerCase();
@@ -241,7 +262,7 @@ export async function runNewsCycle(): Promise<void> {
             console.log(`      → Card URL: ${tempCard.url}`);
             console.log(`      → Source URL: ${cleanUrl}`);
             
-            processedTitles.add(title);
+            processedTitles.add(originalTitle); // Track by original title (without date prefix)
             markAsProcessed(cleanUrl);
             totalCreated++;
             
