@@ -1550,14 +1550,25 @@ app.post("/trello/webhook", async (req, res) => {
         return res.status(200).json({ received: true });
       }
       
-      // Check if card is in PR or WGO list (existing logic for "Process For AI" button)
+      // Check if card is in PR, WGO, or news ingestion lists
       const prListId = process.env.TRELLO_LIST_ID_PR;
       const wgoListId = process.env.TRELLO_LIST_ID_WGO;
+      const marketsListId = process.env.TRELLO_LIST_ID_MARKETS;
+      const economyListId = process.env.TRELLO_LIST_ID_ECONOMY;
+      const commoditiesListId = process.env.TRELLO_LIST_ID_COMMODITIES;
+      const hedgeFundsListId = process.env.TRELLO_LIST_ID_HEDGE_FUNDS;
+      const techListId = process.env.TRELLO_LIST_ID_TECH;
+      
       const isPRList = prListId && listId === prListId;
       const isWGOList = wgoListId && listId === wgoListId;
+      const isNewsIngestionList = (marketsListId && listId === marketsListId) ||
+                                   (economyListId && listId === economyListId) ||
+                                   (commoditiesListId && listId === commoditiesListId) ||
+                                   (hedgeFundsListId && listId === hedgeFundsListId) ||
+                                   (techListId && listId === techListId);
       
-      if (!isPRList && !isWGOList) {
-        console.log(`   ⚠️  Card is not in PR or WGO list, skipping`);
+      if (!isPRList && !isWGOList && !isNewsIngestionList) {
+        console.log(`   ⚠️  Card is not in PR, WGO, or news ingestion list, skipping`);
         return res.status(200).json({ received: true });
       }
       
@@ -1585,7 +1596,43 @@ app.post("/trello/webhook", async (req, res) => {
       const hasButton = /\[(Process For AI|Generate Article)\]/.test(cardDesc);
       const hasPRData = /<!--\s*PR_DATA:/.test(cardDesc) || /```metadata[^`]*PR_DATA:/.test(cardDesc);
       
-      if (hasUrl && !hasButton && !hasPRData) {
+      // For news ingestion lists: Check if article text has been pasted (user added content after scraping failure)
+      // Look for "Article Text:" field with actual content (not just placeholder text)
+      const articleTextMatch = cardDesc.match(/\*\*Article Text:\*\*\s*\n\n(.*?)(?=\n\n---|\n\n\*\*|$)/is);
+      const hasArticleText = articleTextMatch && 
+                             articleTextMatch[1] && 
+                             articleTextMatch[1].trim().length > 50 && // At least 50 chars of actual content
+                             !articleTextMatch[1].includes('*(Paste the full article text here)*') &&
+                             !articleTextMatch[1].includes('*(Paste article text here if scraping fails)*');
+      
+      // For news ingestion cards: If article text has been added, re-add the Process For AI button
+      if (isNewsIngestionList && hasArticleText && !hasButton && !hasPRData) {
+        console.log(`   ✅ News ingestion card has article text but no button - adding "Process For AI" button`);
+        
+        const { TrelloService } = await import("./trello-service");
+        const trello = new TrelloService();
+        
+        const appUrl = process.env.APP_URL || 'http://localhost:3001';
+        const processUrl = `${appUrl}/trello/process-card/${cardId}`;
+        
+        // Add button at the top
+        let updatedDesc = cardDesc;
+        // Remove any existing error messages or old buttons first
+        updatedDesc = updatedDesc.replace(/\n\n---\n\n## ⚠️ Scraping Failed[\s\S]*?(?=\n\n---|\*\*Article Text:)/, '');
+        updatedDesc = updatedDesc.replace(/\n\n---\n\n\*\*\[Process For AI\]\([^)]+\)\*\*/g, '');
+        updatedDesc = updatedDesc.replace(/^\*\*\[Process For AI\]\([^)]+\)\*\*\n\n---\n\n/, '');
+        
+        // Add button at the top
+        updatedDesc = `**[Process For AI](${processUrl})**\n\n---\n\n${updatedDesc.trim()}`;
+        
+        try {
+          await trello.updateCardDescription(cardId, updatedDesc);
+          console.log(`   ✅ Successfully re-added "Process For AI" button to news ingestion card ${cardId}`);
+        } catch (updateError: any) {
+          console.error(`   ❌ Error updating card: ${updateError.message}`);
+        }
+      } else if ((isPRList || isWGOList) && hasUrl && !hasButton && !hasPRData) {
+        // Existing logic for PR and WGO cards
         console.log(`   ✅ Card has URL but no button - adding "Process For AI" button`);
         
         const { TrelloService } = await import("./trello-service");
@@ -1608,7 +1655,7 @@ app.post("/trello/webhook", async (req, res) => {
           console.error(`   ❌ Error updating card: ${updateError.message}`);
         }
       } else {
-        console.log(`   ℹ️  Card doesn't need button (hasUrl: ${hasUrl}, hasButton: ${hasButton}, hasPRData: ${hasPRData})`);
+        console.log(`   ℹ️  Card doesn't need button (isNewsIngestion: ${isNewsIngestionList}, hasArticleText: ${hasArticleText}, hasUrl: ${hasUrl}, hasButton: ${hasButton}, hasPRData: ${hasPRData})`);
       }
     }
     
@@ -1850,9 +1897,79 @@ app.get("/trello/process-card/:cardId", async (req, res) => {
     // Process in background
     (async () => {
       try {
-        // For news ingestion cards, scrape the article using news-story-generator /api/scrape endpoint
+        // For news ingestion cards, check for manually pasted text first, then try scraping
         if (isNewsIngestionList && articleUrl) {
-          console.log(`   🌐 News ingestion card detected - scraping article from URL...`);
+          console.log(`   🌐 News ingestion card detected - checking for article text...`);
+          
+          // First, check if user has manually pasted article text in the "Article Text:" field
+          const articleTextPattern = /\*\*Article Text:\*\*\s*\n\n(.*?)(?=\n\n---|\n\n\*\*|$)/is;
+          const articleTextMatch = card.desc.match(articleTextPattern);
+          const manualArticleText = articleTextMatch && 
+                                    articleTextMatch[1] && 
+                                    articleTextMatch[1].trim().length > 50 && // At least 50 chars
+                                    !articleTextMatch[1].includes('*(Paste the full article text here)*') &&
+                                    !articleTextMatch[1].includes('*(Paste article text here if scraping fails)*');
+          
+          if (manualArticleText && articleTextMatch) {
+            console.log(`   ✅ Found manually pasted article text (${articleTextMatch[1].trim().length} chars)`);
+            
+            // Use the manually pasted text
+            const articleText = articleTextMatch[1].trim();
+            
+            // Store article content in the same format as scraped data
+            const scrapedData = {
+              title: card.name,
+              url: articleUrl,
+              body: articleText,
+              content: articleText,
+              teaser: articleText.substring(0, 500),
+              created: Math.floor(Date.now() / 1000),
+              _scraped: false,
+              _manual: true
+            };
+            
+            const scrapedDataJson = JSON.stringify(scrapedData);
+            const scrapedDataBase64 = Buffer.from(scrapedDataJson).toString('base64');
+            
+            // Build updated description with "Generate Article" button at the top
+            const baseUrl = process.env.APP_URL || 'http://localhost:3001';
+            const generateArticleUrl = `${baseUrl}/trello/generate-article/${cardId}?selectedApp=news-story`;
+            
+            let updatedDesc = card.desc || '';
+            
+            // Remove "Process For AI" button if present
+            updatedDesc = updatedDesc.replace(/\n\n---\n\n\*\*\[Process For AI\]\([^)]+\)\*\*/g, '');
+            updatedDesc = updatedDesc.replace(/^\*\*\[Process For AI\]\([^)]+\)\*\*\n\n---\n\n/, '');
+            // Remove existing "Generate Article" button if present (to avoid duplicates)
+            updatedDesc = updatedDesc.replace(/\n\n---\n\n\*\*\[Generate Article\]\([^)]+\)\*\*/g, '');
+            updatedDesc = updatedDesc.replace(/^\*\*\[Generate Article\]\([^)]+\)\*\*\n\n---\n\n/, '');
+            
+            // Remove scraping error messages
+            updatedDesc = updatedDesc.replace(/\n\n---\n\n## ⚠️ Scraping Failed[\s\S]*?(?=\n\n---|\*\*Article Text:)/, '');
+            
+            // Add "Generate Article" button at the top
+            updatedDesc = `**[Generate Article](${generateArticleUrl})**\n\n---\n\n${updatedDesc.trim()}`;
+            
+            // Store article text in HTML comment (hidden)
+            updatedDesc += `\n\n<!-- PR_DATA:${scrapedDataBase64} -->`;
+            
+            // Update card description
+            await trello.updateCardDescription(cardId, updatedDesc);
+            
+            // Store in memory for quick access
+            if (!trelloCardToPR) {
+              trelloCardToPR = new Map();
+            }
+            trelloCardToPR.set(cardId, scrapedData);
+            
+            console.log(`   ✅ Card processed successfully using manually pasted text. Ready for article generation.`);
+            console.log(`   📄 Article text length: ${articleText.length} chars`);
+            
+            return; // Exit early after handling manual text
+          }
+          
+          // If no manual text, try to scrape from URL
+          console.log(`   📡 No manual text found - attempting to scrape from URL...`);
           
           const scrapeUrl = process.env.ARTICLE_GEN_APP_STORY_URL 
             ? process.env.ARTICLE_GEN_APP_STORY_URL.replace('/api/generate/story', '/api/scrape').replace('/api/generate/pr-story', '/api/scrape')
