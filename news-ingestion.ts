@@ -88,57 +88,64 @@ export async function runNewsCycle(): Promise<void> {
       console.log(`\n📰 Processing feed: ${feed.name}`);
       console.log(`   URL: ${feed.url.substring(0, 80)}...`);
       
-      const feedData = await parser.parseURL(feed.url);
+      // Fetch with "Stealth" Browser Headers to avoid blocks
+      const response = await axios.get(feed.url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9'
+        },
+        timeout: 8000
+      });
+
+      const feedData = await parser.parseString(response.data);
       const items = feedData.items || [];
       
       console.log(`   ✅ Found ${items.length} article(s) in feed`);
       
-      // Process top 5 newest items per feed to avoid spamming
-      const latestItems = items.slice(0, 5);
+      // Only grab top 2 items per feed to avoid spamming the board
+      const latestItems = items.slice(0, 2);
       
       for (const item of latestItems) {
         totalProcessed++;
         
-        // Google News link (user will click this and paste the real source URL)
-        const googleNewsUrl = item.link || item.guid || '';
+        // Direct feeds provide clean URLs - no decoding needed!
+        const cleanUrl = item.link || item.guid || '';
         const title = item.title || 'Untitled Article';
-        // Use contentSnippet (provided by RSS parser) or fallback to empty string
-        const content = item.contentSnippet || '';
+        const content = item.contentSnippet || item.content || '';
         
         // Skip if no URL (can't track duplicates)
-        if (!googleNewsUrl) {
+        if (!cleanUrl) {
           console.log(`   ⚠️  Skipping article without URL: "${title.substring(0, 50)}..."`);
           totalSkipped++;
           continue;
         }
         
-        // Check if already processed (using Google News URL for duplicate tracking)
-        if (isAlreadyProcessed(googleNewsUrl)) {
+        // Check if already processed
+        if (isAlreadyProcessed(cleanUrl)) {
           console.log(`   ⏭️  Already processed: "${title.substring(0, 50)}..."`);
           totalSkipped++;
           continue;
         }
         
-        // Determine target list using router
-        console.log(`   🔍 Determining target list for: "${title.substring(0, 60)}..."`);
-        const targetListId = determineTargetList(title, content, 'BUSINESS');
+        // Route based on Feed Name AND Content
+        const targetListId = routeArticle(feed.name, title, content);
         
         if (!targetListId) {
           console.log(`   ⚠️  No valid list ID found for: "${title.substring(0, 50)}..."`);
           console.log(`   ⚠️  Check that TRELLO_LIST_ID_MARKETS, TRELLO_LIST_ID_ECONOMY, TRELLO_LIST_ID_COMMODITIES, and TRELLO_LIST_ID_HEDGE_FUNDS are set in environment variables`);
-          markAsProcessed(googleNewsUrl); // Mark as processed even if no list found
+          markAsProcessed(cleanUrl); // Mark as processed even if no list found
           totalSkipped++;
           continue;
         }
         
         console.log(`   ✅ Target list determined: ${targetListId}`);
+        console.log(`   ➡️  [${feed.name}] -> ${title.substring(0, 60)}...`);
         
         try {
-          // Create Trello card with Google News link
-          // User will click the link, get redirected to the real source, and paste the source URL below
+          // Create Trello card with Process for AI button at the top (like WGO/PR cards)
           const baseUrl = process.env.APP_URL || 'http://localhost:3001';
           
-          // Build card description with Process for AI button at the top (like WGO/PR cards)
           // First create card to get the card ID, then build full description
           const tempCard = await trello.createCard(
             targetListId,
@@ -151,13 +158,7 @@ export async function runNewsCycle(): Promise<void> {
             const processForAIUrl = `${baseUrl}/trello/process-card/${tempCard.id}`;
             let cardDescription = `**[Process For AI](${processForAIUrl})**\n\n`;
             cardDescription += `---\n\n`;
-            cardDescription += `**Google News Link:** [${googleNewsUrl}](${googleNewsUrl})\n\n`;
-            cardDescription += `**Instructions:**\n`;
-            cardDescription += `1. Click the Google News link above\n`;
-            cardDescription += `2. Copy the real source URL (e.g., cnbc.com, reuters.com, etc.)\n`;
-            cardDescription += `3. Paste it in the "Source URL" field below\n`;
-            cardDescription += `4. Click "Process For AI" to scrape the article\n\n`;
-            cardDescription += `**Source URL:** \n\n`;
+            cardDescription += `**Source URL:** ${cleanUrl}\n\n`;
             cardDescription += `**Article Text:**\n\n`;
             cardDescription += `*(Paste article text here if scraping fails)*\n\n`;
             if (content) {
@@ -170,9 +171,9 @@ export async function runNewsCycle(): Promise<void> {
             console.log(`   ✅ Created card: "${title.substring(0, 50)}..."`);
             console.log(`      → List ID: ${targetListId}`);
             console.log(`      → Card URL: ${tempCard.url}`);
-            console.log(`      → Google News URL: ${googleNewsUrl}`);
+            console.log(`      → Source URL: ${cleanUrl}`);
             
-            markAsProcessed(googleNewsUrl);
+            markAsProcessed(cleanUrl);
             totalCreated++;
             
             // Small delay to avoid rate limiting
@@ -188,7 +189,7 @@ export async function runNewsCycle(): Promise<void> {
       }
       
     } catch (error: any) {
-      console.error(`   ❌ Error processing feed "${feed.name}":`, error.message);
+      console.error(`   ❌ Failed to fetch "${feed.name}": ${error.message}`);
       // Continue with next feed even if one fails
     }
   }
