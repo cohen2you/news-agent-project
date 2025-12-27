@@ -1,6 +1,6 @@
 /**
  * News Ingestion Service
- * Hybrid feed system: Reliable direct feeds (CNBC, Investing.com, Yahoo) + Search feeds (Bing)
+ * Ultimate feed system: 20 sources covering Markets, Economy, Commodities, Tech & AI, Hedge Funds
  */
 
 import Parser from 'rss-parser';
@@ -14,32 +14,37 @@ const parser = new Parser({
   }
 });
 
-// THE HYBRID FEED LIST
-// We use CNBC/Investing.com for reliability (direct links) and Bing for specific keyword searches.
+// --- THE ULTIMATE FEED LIST (20 Sources) ---
 const FEEDS = [
-  // --- RELIABLE DIRECT FEEDS (Clean Links, No Blocking) ---
-  { 
-    name: "CNBC Markets", 
-    url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664' 
-  },
-  { 
-    name: "CNBC Economy", 
-    url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258' 
-  },
-  { 
-    name: "Investing.com Commodities", 
-    url: 'https://www.investing.com/rss/commodities.rss' 
-  },
-  { 
-    name: "Yahoo Finance Top", 
-    url: 'https://finance.yahoo.com/news/rssindex' 
-  },
+  // 1. MARKETS (Broad Coverage)
+  { name: "CNBC Markets", url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664' },
+  { name: "Business Insider", url: 'https://markets.businessinsider.com/rss/news' },
+  { name: "Yahoo Finance Top", url: 'https://finance.yahoo.com/news/rssindex' },
+  { name: "Seeking Alpha Market News", url: 'https://seekingalpha.com/market_news/feed' },
 
-  // --- SEARCH FEEDS (Good for specific niches, but might block occasionally) ---
-  { 
-    name: "Bing: Hedge Funds", 
-    url: 'https://www.bing.com/news/search?q=Hedge+Fund+OR+Bill+Ackman+OR+Ray+Dalio+OR+Ken+Griffin+OR+Citadel&format=rss' 
-  }
+  // 2. ECONOMY & MACRO
+  { name: "CNBC Economy", url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258' },
+  { name: "MarketWatch Top Stories", url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories' },
+  { name: "Bing: Fed & Rates", url: 'https://www.bing.com/news/search?q="Jerome+Powell"+OR+"Fed+Rate"+OR+"CPI"+OR+"Inflation"+OR+"Recession"&format=rss' },
+
+  // 3. COMMODITIES
+  { name: "Investing.com Commodities", url: 'https://www.investing.com/rss/commodities.rss' },
+  { name: "OilPrice.com", url: 'https://oilprice.com/rss/main' },
+  { name: "Kitco Gold", url: 'https://www.kitco.com/rss/category/news' },
+
+  // 4. TECH, AI & CRYPTO
+  { name: "TechCrunch", url: 'https://techcrunch.com/feed/' },
+  { name: "The Verge", url: 'https://www.theverge.com/rss/index.xml' },
+  { name: "Bing: AI & Chips", url: 'https://www.bing.com/news/search?q="Nvidia"+OR+"OpenAI"+OR+"Sam+Altman"+OR+"TSMC"+OR+"Artificial+Intelligence"&format=rss' },
+
+  // 5. HEDGE FUNDS & INVESTOR TITANS
+  // Tracks: Ackman, Dalio, Griffin, Tepper, Icahn, Druckenmiller... AND BUFFETT
+  { name: "Bing: Investor Titans", url: 'https://www.bing.com/news/search?q="Bill+Ackman"+OR+"Ray+Dalio"+OR+"Ken+Griffin"+OR+"Carl+Icahn"+OR+"Warren+Buffett"+OR+"Berkshire+Hathaway"&format=rss' },
+  { name: "Opalesque", url: 'https://www.opalesque.com/rss' },
+
+  // 6. MARKET MOVERS (CEOs/Personalities)
+  // Tracks: Musk, Dimon, Cathie Wood
+  { name: "Bing: CEOs", url: 'https://www.bing.com/news/search?q="Elon+Musk"+OR+"Jamie+Dimon"+OR+"Cathie+Wood"+OR+"Michael+Burry"&format=rss' }
 ];
 
 // Define List IDs (From your .env)
@@ -48,26 +53,45 @@ const LIST_IDS = {
   ECONOMY: process.env.TRELLO_LIST_ID_ECONOMY || '',
   COMMODITIES: process.env.TRELLO_LIST_ID_COMMODITIES || '',
   HEDGE_FUNDS: process.env.TRELLO_LIST_ID_HEDGE_FUNDS || '',
-  DEFAULT: process.env.TRELLO_LIST_ID || '' 
+  TECH: process.env.TRELLO_LIST_ID_TECH || process.env.TRELLO_LIST_ID_MARKETS || '',
+  DEFAULT: process.env.TRELLO_LIST_ID || ''
 };
 
 // Smart Router Logic
 function routeArticle(feedName: string, title: string, snippet: string): string {
   const text = (title + " " + snippet).toLowerCase();
   
-  // A. Source-Based Routing (If it comes from the "Economy" feed, send it there!)
+  // A. Feed Name Overrides
   if (feedName.includes("Economy")) return LIST_IDS.ECONOMY;
-  if (feedName.includes("Commodities")) return LIST_IDS.COMMODITIES;
-  if (feedName.includes("Hedge Funds")) return LIST_IDS.HEDGE_FUNDS;
-  if (feedName.includes("Markets")) return LIST_IDS.MARKETS;
+  if (feedName.includes("Commodities") || feedName.includes("Oil") || feedName.includes("Gold")) return LIST_IDS.COMMODITIES;
+  if (feedName.includes("Tech") || feedName.includes("AI")) return LIST_IDS.TECH;
+  
+  // Send Investor Titans feed straight to Hedge Funds
+  if (feedName.includes("Investor Titans") || feedName.includes("Hedge Fund")) return LIST_IDS.HEDGE_FUNDS;
 
-  // B. Content-Based Routing (Fallback for general feeds like Yahoo)
-  if (text.match(/hedge fund|ackman|dalio|griffin|citadel|13f/)) return LIST_IDS.HEDGE_FUNDS;
-  if (text.match(/oil|gold|silver|copper|wheat|gas|crude/)) return LIST_IDS.COMMODITIES;
-  if (text.match(/inflation|cpi|fed|powell|gdp|rates|recession/)) return LIST_IDS.ECONOMY;
-  if (text.match(/s&p|nasdaq|dow|stocks|market|rally|selloff/)) return LIST_IDS.MARKETS;
+  // B. Specific Personality Routing
+  
+  // Hedge Funds & Investor Icons (Includes Buffett/Berkshire now)
+  if (text.match(/ackman|dalio|griffin|tepper|icahn|druckenmiller|buffett|berkshire|munger|pershing square|bridgewater|citadel|13f/)) {
+    return LIST_IDS.HEDGE_FUNDS;
+  }
 
-  return LIST_IDS.DEFAULT || LIST_IDS.MARKETS;
+  // Macro / Economy
+  if (text.match(/el-erian|larry summers|powell|yellen|lagarde|gdp|cpi|pce|jobs|unemployment/)) {
+    return LIST_IDS.ECONOMY;
+  }
+
+  // Tech / AI
+  if (text.match(/nvidia|openai|altman|musk|crypto|bitcoin|apple|microsoft|google|meta|tsmc/)) {
+    return LIST_IDS.TECH;
+  }
+
+  // C. Fallback Keyword Routing
+  if (text.match(/oil|gold|silver|copper|gas|crude/)) return LIST_IDS.COMMODITIES;
+  if (text.match(/rate|recession|inflation|yield/)) return LIST_IDS.ECONOMY;
+  
+  // Default: EVERYTHING else (Earnings, S&P 500 movements, Analyst Upgrades) goes to Markets
+  return LIST_IDS.MARKETS;
 }
 
 // Track processed article URLs to avoid duplicates
@@ -110,6 +134,7 @@ export async function runNewsCycle(): Promise<void> {
   let totalProcessed = 0;
   let totalCreated = 0;
   let totalSkipped = 0;
+  const processedTitles = new Set<string>();
 
   for (const feed of FEEDS) {
     try {
@@ -137,21 +162,27 @@ export async function runNewsCycle(): Promise<void> {
       for (const item of latestItems) {
         totalProcessed++;
         
-        // Direct feeds provide clean URLs - no decoding needed!
         const cleanUrl = item.link || item.guid || '';
         const title = item.title || 'Untitled Article';
         const content = item.contentSnippet || item.content || '';
         
-        // Skip if no URL (can't track duplicates)
-        if (!cleanUrl) {
-          console.log(`   ⚠️  Skipping article without URL: "${title.substring(0, 50)}..."`);
+        // Skip if no URL or title
+        if (!cleanUrl || !title) {
+          console.log(`   ⚠️  Skipping article without URL or title`);
           totalSkipped++;
           continue;
         }
         
-        // Check if already processed
+        // Check if already processed (by title to avoid duplicates from different feeds)
+        if (processedTitles.has(title)) {
+          console.log(`   ⏭️  Already processed (duplicate title): "${title.substring(0, 50)}..."`);
+          totalSkipped++;
+          continue;
+        }
+        
+        // Also check URL for duplicates
         if (isAlreadyProcessed(cleanUrl)) {
-          console.log(`   ⏭️  Already processed: "${title.substring(0, 50)}..."`);
+          console.log(`   ⏭️  Already processed (duplicate URL): "${title.substring(0, 50)}..."`);
           totalSkipped++;
           continue;
         }
@@ -161,14 +192,23 @@ export async function runNewsCycle(): Promise<void> {
         
         if (!targetListId) {
           console.log(`   ⚠️  No valid list ID found for: "${title.substring(0, 50)}..."`);
-          console.log(`   ⚠️  Check that TRELLO_LIST_ID_MARKETS, TRELLO_LIST_ID_ECONOMY, TRELLO_LIST_ID_COMMODITIES, and TRELLO_LIST_ID_HEDGE_FUNDS are set in environment variables`);
-          markAsProcessed(cleanUrl); // Mark as processed even if no list found
+          console.log(`   ⚠️  Check that TRELLO_LIST_ID_MARKETS, TRELLO_LIST_ID_ECONOMY, TRELLO_LIST_ID_COMMODITIES, TRELLO_LIST_ID_HEDGE_FUNDS, and TRELLO_LIST_ID_TECH are set in environment variables`);
+          processedTitles.add(title);
+          markAsProcessed(cleanUrl);
           totalSkipped++;
           continue;
         }
         
-        console.log(`   ✅ Target list determined: ${targetListId}`);
-        console.log(`   ➡️  [${feed.name}] -> ${title.substring(0, 60)}...`);
+        // Logging destination for clarity
+        let listName = "UNKNOWN";
+        if (targetListId === LIST_IDS.HEDGE_FUNDS) listName = "HEDGE FUNDS";
+        else if (targetListId === LIST_IDS.MARKETS) listName = "MARKETS";
+        else if (targetListId === LIST_IDS.TECH) listName = "TECH";
+        else if (targetListId === LIST_IDS.ECONOMY) listName = "ECONOMY";
+        else if (targetListId === LIST_IDS.COMMODITIES) listName = "COMMODITIES";
+        
+        console.log(`   ✅ Target list determined: ${targetListId} [${listName}]`);
+        console.log(`   ➡️  [${feed.name}] -> [${listName}] ${title.substring(0, 60)}...`);
         
         try {
           // Create Trello card with Process for AI button at the top (like WGO/PR cards)
@@ -197,10 +237,11 @@ export async function runNewsCycle(): Promise<void> {
             await trello.updateCardDescription(tempCard.id, cardDescription);
             
             console.log(`   ✅ Created card: "${title.substring(0, 50)}..."`);
-            console.log(`      → List ID: ${targetListId}`);
+            console.log(`      → List ID: ${targetListId} [${listName}]`);
             console.log(`      → Card URL: ${tempCard.url}`);
             console.log(`      → Source URL: ${cleanUrl}`);
             
+            processedTitles.add(title);
             markAsProcessed(cleanUrl);
             totalCreated++;
             
