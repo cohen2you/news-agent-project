@@ -3416,9 +3416,25 @@ Proposed Angle: Provide technical analysis and market insights${ticker ? ` for $
       updatedDesc += `**View Article:** [View Generated Article](${articleViewUrl})\n\n`;
       updatedDesc += `**Generated:** ${new Date().toLocaleString()}\n`;
       
+      // Store article content in hidden HTML comment so it persists even if server restarts
+      // This ensures the article can be recovered from Trello if the in-memory storage is lost
+      const articleContentBase64 = Buffer.from(generatedArticle).toString('base64');
+      updatedDesc += `\n\n<!-- GENERATED_ARTICLE_ID:${generatedId} -->`;
+      updatedDesc += `\n<!-- GENERATED_ARTICLE_CONTENT:${articleContentBase64} -->`;
+      
+      // Check if description exceeds Trello's limit (16,384 chars, be conservative with 15,000)
+      const MAX_DESC_LENGTH = 15000;
+      if (updatedDesc.length > MAX_DESC_LENGTH) {
+        console.warn(`   ⚠️  Description too long (${updatedDesc.length} chars), truncating article content...`);
+        // If too long, just store a reference to the article ID (the content is still in memory for now)
+        updatedDesc = updatedDesc.replace(/\n<!-- GENERATED_ARTICLE_CONTENT:[^>]+-->/g, '');
+        updatedDesc += `\n<!-- GENERATED_ARTICLE_CONTENT_TRUNCATED: Article too long to store in card -->`;
+      }
+      
       await trello.updateCardDescription(cardId, updatedDesc);
       console.log(`   ✅ Card description updated successfully (length: ${updatedDesc.length} chars)`);
       console.log(`   🔗 Article link: ${articleViewUrl}`);
+      console.log(`   💾 Article content also stored in card (hidden) for persistence`);
       
       // Add comment with article preview
       const articlePreview = generatedArticle
@@ -5845,7 +5861,7 @@ Proposed Angle: Analyze the implications of this press release for ${prTicker} i
   }
 });
 
-app.get("/pr-auto-scan/articles/:id", (req, res) => {
+app.get("/pr-auto-scan/articles/:id", async (req, res) => {
   const { id } = req.params;
   const { format } = req.query; // Support ?format=json for API calls
   console.log(`\n📄 [GET /pr-auto-scan/articles/${id}] Request received`);
@@ -5901,13 +5917,95 @@ app.get("/pr-auto-scan/articles/:id", (req, res) => {
   }
   
   if (!article) {
-    console.log(`❌ [GET /pr-auto-scan/articles/${id}] Article not found`);
-    console.log(`   💡 This might happen if:`);
-    console.log(`      - The server was restarted (articles are stored in memory)`);
-    console.log(`      - The article generation failed before storage`);
-    console.log(`      - The article ID doesn't match (check logs for actual ID)`);
+    console.log(`❌ [GET /pr-auto-scan/articles/${id}] Article not found in memory`);
+    console.log(`   💡 This likely means the server was restarted (articles are stored in memory)`);
     console.log(`   📊 Total articles in memory: ${prGeneratedArticles.length}`);
-    return res.status(404).json({ error: "Article not found" });
+    console.log(`   🔍 Attempting to recover article from Trello cards...`);
+    
+    // Try to recover article from Trello card descriptions (stored in hidden HTML comments)
+    // Search through all cards in relevant lists for the article ID
+    try {
+      const { TrelloService } = await import("./trello-service");
+      const trello = new TrelloService();
+      
+      // Search in all lists that might contain generated articles
+      const listIds = [
+        process.env.TRELLO_LIST_ID_SUBMITTED,
+        process.env.TRELLO_LIST_ID_PR,
+        process.env.TRELLO_LIST_ID_WGO,
+        process.env.TRELLO_LIST_ID_MARKETS,
+        process.env.TRELLO_LIST_ID_ECONOMY,
+        process.env.TRELLO_LIST_ID_COMMODITIES,
+        process.env.TRELLO_LIST_ID_HEDGE_FUNDS,
+        process.env.TRELLO_LIST_ID_TECH
+      ].filter(id => id) as string[];
+      
+      for (const listId of listIds) {
+        try {
+          const cards = await trello.getCardsInList(listId);
+          for (const card of cards) {
+            if (card.desc && card.desc.includes(`GENERATED_ARTICLE_ID:${id}`)) {
+              // Found the card! Extract the article content
+              const contentMatch = card.desc.match(/<!--\s*GENERATED_ARTICLE_CONTENT:([^>]+)\s*-->/);
+              if (contentMatch && !contentMatch[1].includes('TRUNCATED')) {
+                const articleContent = Buffer.from(contentMatch[1], 'base64').toString('utf-8');
+                
+                // Reconstruct article object from card data
+                const recoveredArticle = {
+                  id: id,
+                  title: card.name.replace(/^\[.*?\]\s*/, '').replace(/\.\.\.$/, ''),
+                  generatedArticle: articleContent,
+                  ticker: 'N/A',
+                  createdAt: Date.now(),
+                  pitch: '',
+                  sourceUrl: '',
+                  sourceArticle: {}
+                };
+                
+                console.log(`   ✅ Recovered article from Trello card: ${card.id}`);
+                
+                // Return the recovered article in JSON format (for now)
+                if (format === 'json') {
+                  return res.json({
+                    id: recoveredArticle.id,
+                    ticker: recoveredArticle.ticker,
+                    title: recoveredArticle.title,
+                    sourceArticle: recoveredArticle.sourceArticle,
+                    sourceUrl: recoveredArticle.sourceUrl,
+                    generatedArticle: recoveredArticle.generatedArticle,
+                    pitch: recoveredArticle.pitch,
+                    createdAt: recoveredArticle.createdAt,
+                    _recovered: true
+                  });
+                }
+                
+                // For HTML format, we'd need to render the full HTML page
+                // For now, return JSON with a note
+                return res.json({
+                  id: recoveredArticle.id,
+                  title: recoveredArticle.title,
+                  generatedArticle: recoveredArticle.generatedArticle,
+                  _recovered: true,
+                  _note: "Article recovered from Trello card. Use ?format=json to view content."
+                });
+              }
+            }
+          }
+        } catch (listError: any) {
+          console.warn(`   ⚠️  Error searching list ${listId}: ${listError.message}`);
+        }
+      }
+      
+      console.log(`   ❌ Could not recover article from Trello cards`);
+    } catch (recoveryError: any) {
+      console.warn(`   ⚠️  Error attempting to recover article: ${recoveryError.message}`);
+    }
+    
+    return res.status(404).json({ 
+      error: "Article not found",
+      message: "This article was likely lost due to a server restart. Articles are stored in memory and are not persisted between restarts.",
+      suggestion: "Check the Trello card for the article content, or regenerate the article."
+    });
   }
   console.log(`✅ [GET /pr-auto-scan/articles/${id}] Article found: ${article.ticker} - ${article.title}`);
   
