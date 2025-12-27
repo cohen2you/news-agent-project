@@ -376,9 +376,11 @@ export class TrelloService {
       additionalInfoText += '\n';
     }
     
-    // Build links section
-    const linksText = `\n**Source:** [View Original](${sourceUrl})` + 
-                     `\n\n---\n\n**[Generate Article](${generateArticleUrl})**`;
+    // Build links section (Generate Article button moved to top, so only source link here)
+    const linksText = `\n**Source:** [View Original](${sourceUrl})`;
+    
+    // Generate Article button will be added at the top of description
+    const generateArticleButton = `**[Generate Article](${generateArticleUrl})**\n\n---\n\n`;
     
     // Store PR data as base64-encoded JSON at the very end (hidden in HTML comment)
     // HTML comments are truly hidden in Trello and don't clutter the visible description

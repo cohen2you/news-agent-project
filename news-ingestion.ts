@@ -138,32 +138,47 @@ export async function runNewsCycle(): Promise<void> {
           // User will click the link, get redirected to the real source, and paste the source URL below
           const baseUrl = process.env.APP_URL || 'http://localhost:3001';
           
-          // Build card description with instructions for user
-          let cardDescription = `**Google News Link:** [${googleNewsUrl}](${googleNewsUrl})\n\n`;
-          cardDescription += `**Instructions:**\n`;
-          cardDescription += `1. Click the Google News link above\n`;
-          cardDescription += `2. Copy the real source URL (e.g., cnbc.com, reuters.com, etc.)\n`;
-          cardDescription += `3. Paste it in the "Source URL" field below\n`;
-          cardDescription += `4. (Optional) If scraping fails, paste the article text in the "Article Text" field\n\n`;
-          cardDescription += `**Source URL:** \n\n`;
-          cardDescription += `**Article Text:**\n\n`;
-          cardDescription += `*(Paste article text here if scraping fails)*\n\n`;
-          if (content) {
-            cardDescription += `---\n\n**Article Summary:**\n${content.substring(0, 1000)}${content.length > 1000 ? '...' : ''}\n\n`;
-          }
-          
-          // Create card first
-          const card = await trello.createCard(
+          // Build card description with Generate Article button at the top
+          // First create card to get the card ID, then build full description
+          const tempCard = await trello.createCard(
             targetListId,
             title,
-            cardDescription
+            '' // Create with empty description first to get card ID
           );
           
-          // Now add Generate Article button with actual card ID
-          if (card && card.id) {
-            const generateArticleUrl = `${baseUrl}/trello/generate-article/${card.id}?selectedApp=story`;
-            cardDescription += `---\n\n**[Generate Article](${generateArticleUrl})**`;
-            await trello.updateCardDescription(card.id, cardDescription);
+          // Build full description with Generate Article button at the top
+          if (tempCard && tempCard.id) {
+            const generateArticleUrl = `${baseUrl}/trello/generate-article/${tempCard.id}?selectedApp=story`;
+            let cardDescription = `**[Generate Article](${generateArticleUrl})**\n\n`;
+            cardDescription += `---\n\n`;
+            cardDescription += `**Google News Link:** [${googleNewsUrl}](${googleNewsUrl})\n\n`;
+            cardDescription += `**Instructions:**\n`;
+            cardDescription += `1. Click the Google News link above\n`;
+            cardDescription += `2. Copy the real source URL (e.g., cnbc.com, reuters.com, etc.)\n`;
+            cardDescription += `3. Paste it in the "Source URL" field below\n`;
+            cardDescription += `4. (Optional) If scraping fails, paste the article text in the "Article Text" field\n\n`;
+            cardDescription += `**Source URL:** \n\n`;
+            cardDescription += `**Article Text:**\n\n`;
+            cardDescription += `*(Paste article text here if scraping fails)*\n\n`;
+            if (content) {
+              cardDescription += `---\n\n**Article Summary:**\n${content.substring(0, 1000)}${content.length > 1000 ? '...' : ''}\n\n`;
+            }
+            
+            // Update card with full description
+            await trello.updateCardDescription(tempCard.id, cardDescription);
+            
+            console.log(`   ✅ Created card: "${title.substring(0, 50)}..."`);
+            console.log(`      → List ID: ${targetListId}`);
+            console.log(`      → Card URL: ${tempCard.url}`);
+            console.log(`      → Google News URL: ${googleNewsUrl}`);
+            
+            markAsProcessed(googleNewsUrl);
+            totalCreated++;
+            
+            // Small delay to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            continue; // Skip to next item
           }
           
           console.log(`   ✅ Created card: "${title.substring(0, 50)}..."`);
