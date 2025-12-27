@@ -60,20 +60,21 @@ function formatPubDate(isoDateString?: string): string {
   const date = new Date(isoDateString);
   
   // Format: "Dec 27 2:30 PM" in EST/EDT (America/New_York timezone)
-  // Using toLocaleString with timezone option to handle EST/EDT automatically
-  const estDate = new Date(date.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  // Using toLocaleString with timezone option for each component to handle EST/EDT automatically
+  const timeZone = 'America/New_York';
   
-  const month = estDate.toLocaleString('en-US', { month: 'short' });
-  const day = estDate.getDate();
-  let hour = estDate.getHours();
-  const minute = estDate.getMinutes().toString().padStart(2, '0');
-  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const month = date.toLocaleString('en-US', { timeZone, month: 'short' });
+  const day = parseInt(date.toLocaleString('en-US', { timeZone, day: 'numeric' }));
+  const hour24 = parseInt(date.toLocaleString('en-US', { timeZone, hour: 'numeric', hour12: false }));
+  const minute = parseInt(date.toLocaleString('en-US', { timeZone, minute: 'numeric' }));
   
   // Convert 24-hour to 12-hour format
-  hour = hour % 12;
-  hour = hour ? hour : 12; // the hour '0' should be '12'
+  let hour12 = hour24 % 12;
+  hour12 = hour12 ? hour12 : 12; // the hour '0' should be '12'
+  const ampm = hour24 >= 12 ? 'PM' : 'AM';
+  const minutePadded = minute.toString().padStart(2, '0');
 
-  return `[${month} ${day} ${hour}:${minute} ${ampm}]`;
+  return `[${month} ${day} ${hour12}:${minutePadded} ${ampm}]`;
 }
 
 // Smart Router Logic
