@@ -922,6 +922,12 @@ app.post("/analyst/test-create-card", async (req, res) => {
     if (ticker) {
       title = `${ticker}... ${title}`;
     }
+    
+    // Format date and add timestamp prefix to title
+    const { formatPubDate } = await import("./date-utils");
+    const noteDate = noteData.date || new Date();
+    const datePrefix = formatPubDate(noteDate);
+    title = `${datePrefix} ${title}`;
 
     // Build card description (same format as email agent)
     let description = `${content.substring(0, 1000)}${content.length > 1000 ? '...' : ''}\n\n`;
