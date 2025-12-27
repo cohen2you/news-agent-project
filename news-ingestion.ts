@@ -47,6 +47,9 @@ const FEEDS = [
   { name: "Dealbreaker", url: 'https://dealbreaker.com/.rss/full/' }
 ];
 
+// --- CONFIGURATION ---
+const MAX_CARDS_PER_LIST = 50; // Maximum number of cards to keep in each list (oldest are deleted when exceeded)
+
 // Define List IDs (From your .env)
 const LIST_IDS = {
   MARKETS: process.env.TRELLO_LIST_ID_MARKETS || '',
@@ -58,6 +61,57 @@ const LIST_IDS = {
 };
 
 // Note: formatPubDate is now imported from date-utils.ts
+
+// --- HELPER: GARBAGE COLLECTOR ---
+// Checks if a list is too big and deletes the oldest cards (cards at the bottom)
+async function manageListSize(listId: string): Promise<void> {
+  try {
+    // Get all cards in the list (only need ID field for deletion)
+    const response = await axios.get(`https://api.trello.com/1/lists/${listId}/cards`, {
+      params: {
+        fields: 'id', // Only fetch ID to minimize data transfer
+        key: process.env.TRELLO_API_KEY,
+        token: process.env.TRELLO_TOKEN,
+      }
+    });
+
+    const cards = response.data;
+
+    // Check if we are over the limit
+    if (cards.length > MAX_CARDS_PER_LIST) {
+      const cardsToDeleteCount = cards.length - MAX_CARDS_PER_LIST;
+      console.log(`   🧹 [Cleanup] List ${listId} has ${cards.length} cards. Deleting ${cardsToDeleteCount} oldest...`);
+
+      // Trello returns cards in order (usually top to bottom)
+      // Since new cards are added to the TOP (pos: 'top'), oldest cards are at the BOTTOM (end of array)
+      // We slice from the end to get the oldest ones
+      const cardsToDelete = cards.slice(-cardsToDeleteCount);
+
+      for (const card of cardsToDelete) {
+        try {
+          await axios.delete(`https://api.trello.com/1/cards/${card.id}`, {
+            params: {
+              key: process.env.TRELLO_API_KEY,
+              token: process.env.TRELLO_TOKEN,
+            }
+          });
+          console.log(`      🗑️  Deleted old card: ${card.id}`);
+          
+          // Small delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 200));
+        } catch (deleteError: any) {
+          console.error(`      ⚠️  Failed to delete card ${card.id}: ${deleteError.message}`);
+        }
+      }
+      
+      console.log(`   ✅ [Cleanup] Completed for list ${listId}`);
+    } else {
+      console.log(`   ℹ️  [Cleanup] List ${listId} has ${cards.length} cards (under limit of ${MAX_CARDS_PER_LIST})`);
+    }
+  } catch (error: any) {
+    console.error(`   ⚠️  Failed to cleanup list ${listId}:`, error.message);
+  }
+}
 
 // Smart Router Logic
 function routeArticle(feedName: string, title: string, snippet: string): string {
@@ -144,6 +198,9 @@ export async function runNewsCycle(): Promise<void> {
   let totalCreated = 0;
   let totalSkipped = 0;
   const processedTitles = new Set<string>();
+  
+  // Track which lists we modified so we can clean them up at the end
+  const listsToCleanup = new Set<string>();
 
   for (const feed of FEEDS) {
     try {
@@ -275,6 +332,9 @@ export async function runNewsCycle(): Promise<void> {
             markAsProcessed(cleanUrl);
             totalCreated++;
             
+            // Mark this list for cleanup at the end
+            listsToCleanup.add(targetListId);
+            
             // Small delay to avoid rate limiting
             await new Promise(resolve => setTimeout(resolve, 500));
             
@@ -297,6 +357,21 @@ export async function runNewsCycle(): Promise<void> {
       }
       // Continue with next feed even if one fails
     }
+  }
+  
+  // Run Garbage Collector on all modified lists
+  if (listsToCleanup.size > 0) {
+    console.log(`\n${"=".repeat(60)}`);
+    console.log(`🧹 [Cleanup] Running Garbage Collector on ${listsToCleanup.size} list(s)...`);
+    console.log(`${"=".repeat(60)}`);
+    
+    for (const listId of listsToCleanup) {
+      await manageListSize(listId);
+    }
+    
+    console.log(`${"=".repeat(60)}`);
+    console.log(`✅ [Cleanup] Garbage collection complete`);
+    console.log(`${"=".repeat(60)}\n`);
   }
   
   console.log(`\n${"=".repeat(60)}`);
