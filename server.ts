@@ -1871,7 +1871,7 @@ app.get("/trello/process-card/:cardId", async (req, res) => {
               throw new Error(`Scraping failed: ${scrapeResponse.status} ${scrapeResponse.statusText}`);
             }
             
-            const scrapeData = await scrapeResponse.json();
+            const scrapeData = await scrapeResponse.json() as { text?: string; content?: string };
             const scrapedText = scrapeData.text || scrapeData.content || '';
             
             if (!scrapedText || scrapedText.trim().length < 50) {
