@@ -2636,14 +2636,27 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
             })
             .filter(url => url.length > 0); // Remove empty URLs
           
-          // Prioritize Benzinga URLs, but accept any external URL if no Benzinga found
-          const benzingaUrls = externalUrls.filter(url => url.includes('benzinga.com'));
+          // Filter out image URLs - prioritize article URLs over image URLs
+          const articleUrls = externalUrls.filter(url => !isImageUrl(url));
+          const imageUrls = externalUrls.filter(url => isImageUrl(url));
+          
+          // Prioritize Benzinga URLs, but accept any article URL if no Benzinga found
+          const benzingaUrls = articleUrls.filter(url => url.includes('benzinga.com'));
           if (benzingaUrls.length > 0) {
             cardDescriptionUrl = benzingaUrls[0];
             console.log(`   ✅ Found Benzinga URL in plain text: ${cardDescriptionUrl}`);
+          } else if (articleUrls.length > 0) {
+            // Use first article URL (not image URL)
+            cardDescriptionUrl = articleUrls[0];
+            console.log(`   ✅ Found article URL in plain text: ${cardDescriptionUrl}`);
           } else if (externalUrls.length > 0) {
+            // Fallback: use first external URL even if it's an image (should rarely happen)
+            console.warn(`   ⚠️  Only image URLs found, using first one: ${externalUrls[0]}`);
             cardDescriptionUrl = externalUrls[0];
-            console.log(`   ✅ Found external URL in plain text: ${cardDescriptionUrl}`);
+          }
+          
+          if (imageUrls.length > 0 && cardDescriptionUrl) {
+            console.log(`   ℹ️  Filtered out ${imageUrls.length} image URL(s), using article URL instead`);
           }
         }
         
