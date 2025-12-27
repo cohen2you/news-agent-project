@@ -480,8 +480,8 @@ export class TrelloService {
       }
     }
     
-    // Combine all parts
-    desc = desc + additionalInfoText + linksText + prDataSection;
+    // Combine all parts (Generate Article button at top)
+    desc = generateArticleButton + desc + additionalInfoText + linksText + prDataSection;
     
     // Final check: ensure description doesn't exceed Trello's limit (16,384 chars)
     // Be conservative and limit to 12,000 to leave room for updates and encoding overhead
