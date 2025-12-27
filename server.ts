@@ -1996,26 +1996,47 @@ app.get("/trello/process-card/:cardId", async (req, res) => {
             // Remove the Article Text field (including the full text that was pasted)
             updatedDesc = updatedDesc.replace(/\n\n\*\*Article Text:\*\*\s*\n\n[\s\S]*?(?=\n\n---|$)/, '');
             
-            // Keep only Source URL and Article Summary (if present)
-            // Extract Source URL
-            const sourceUrlMatch = updatedDesc.match(/\*\*Source URL:\*\*\s*\n?\s*(https?:\/\/[^\s\n]+)/i);
-            const sourceUrl = sourceUrlMatch ? sourceUrlMatch[1] : articleUrl;
-            
-            // Extract Article Summary (if present)
-            const summaryMatch = updatedDesc.match(/\*\*Article Summary:\*\*\s*\n([\s\S]*?)(?=\n\n---|$)/i);
-            const summary = summaryMatch ? summaryMatch[1].trim() : '';
-            
-            // Build clean description
-            updatedDesc = `**Source URL:** ${sourceUrl}`;
-            if (summary) {
-              updatedDesc += `\n\n**Article Summary:**\n${summary}`;
+            // Keep only Source URL (extract clean URL from markdown link if needed)
+            // Extract Source URL - handle both markdown link format and plain URL
+            let sourceUrl = articleUrl;
+            const sourceUrlMatch = updatedDesc.match(/\*\*Source URL:\*\*\s*\n?\s*(?:\[([^\]]+)\]\(([^)]+)\)|(https?:\/\/[^\s\n]+))/i);
+            if (sourceUrlMatch) {
+              sourceUrl = sourceUrlMatch[2] || sourceUrlMatch[3] || articleUrl;
             }
+            
+            // Build clean description - just Source URL, no summary (to keep it short)
+            // The full article text is already stored in PR_DATA
+            updatedDesc = `**Source URL:** ${sourceUrl}`;
             
             // Add "Generate Article" button at the top
             updatedDesc = `**[Generate Article](${generateArticleUrl})**\n\n---\n\n${updatedDesc.trim()}`;
             
             // Store article text in HTML comment (hidden) - this is what the generator will use
             updatedDesc += `\n\n<!-- PR_DATA:${scrapedDataBase64} -->`;
+            
+            // Check if description exceeds Trello's limit (16,384 chars, but be conservative)
+            const MAX_DESC_LENGTH = 12000; // Leave buffer for encoding overhead
+            if (updatedDesc.length > MAX_DESC_LENGTH) {
+              console.warn(`   ⚠️  Description too long (${updatedDesc.length} chars), truncating PR_DATA...`);
+              // If still too long, truncate the article text in PR_DATA
+              const truncatedText = articleText.substring(0, Math.max(1000, articleText.length - (updatedDesc.length - MAX_DESC_LENGTH)));
+              const truncatedData = {
+                ...scrapedData,
+                body: truncatedText,
+                content: truncatedText,
+                teaser: truncatedText.substring(0, 500)
+              };
+              const truncatedJson = JSON.stringify(truncatedData);
+              const truncatedBase64 = Buffer.from(truncatedJson).toString('base64');
+              
+              // Rebuild with truncated data
+              updatedDesc = `**[Generate Article](${generateArticleUrl})**\n\n---\n\n**Source URL:** ${sourceUrl}\n\n<!-- PR_DATA:${truncatedBase64} -->`;
+              
+              if (updatedDesc.length > MAX_DESC_LENGTH) {
+                console.error(`   ❌ Description still too long after truncation (${updatedDesc.length} chars). Article text may be too large.`);
+                throw new Error(`Description too long (${updatedDesc.length} chars). Article text exceeds maximum size.`);
+              }
+            }
             
             // Update card description
             await trello.updateCardDescription(cardId, updatedDesc);
@@ -2035,8 +2056,10 @@ app.get("/trello/process-card/:cardId", async (req, res) => {
           // If no manual text, try to scrape from URL
           console.log(`   📡 No manual text found - attempting to scrape from URL...`);
           
-          const scrapeUrl = process.env.ARTICLE_GEN_APP_STORY_URL 
-            ? process.env.ARTICLE_GEN_APP_STORY_URL.replace('/api/generate/story', '/api/scrape').replace('/api/generate/pr-story', '/api/scrape')
+          // Use NEWS_STORY_URL for news ingestion cards (if available), otherwise fall back to STORY_URL
+          const newsStoryBaseUrl = process.env.ARTICLE_GEN_APP_NEWS_STORY_URL || process.env.ARTICLE_GEN_APP_STORY_URL;
+          const scrapeUrl = newsStoryBaseUrl 
+            ? newsStoryBaseUrl.replace('/api/generate/story', '/api/scrape').replace('/api/generate/pr-story', '/api/scrape')
             : 'http://localhost:3000/api/scrape';
           
           console.log(`   🔗 Calling scrape endpoint: ${scrapeUrl}`);
