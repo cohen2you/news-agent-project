@@ -2572,6 +2572,7 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
         };
         
         // Try to find URL in description - use comprehensive extraction
+        // CRITICAL: For news ingestion cards, ONLY use the "Source URL:" field - ignore all other URLs
         console.log(`   🔍 Extracting URL from card description (length: ${cardData.desc?.length || 0})...`);
         
         // Helper function to filter out image URLs (static domains, image paths, image file extensions)
@@ -2589,39 +2590,38 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
           return imagePatterns.some(pattern => pattern.test(url));
         };
         
-        // Pattern 1: **Source URL:** format (for news ingestion cards)
+        // PRIORITY 1: **Source URL:** format (for news ingestion cards) - THIS IS THE AUTHORITATIVE SOURCE
+        // This MUST be checked first and used exclusively for news ingestion cards
         // Handles both same-line and next-line URLs
         const sourceUrlPattern = /\*\*Source URL:\*\*\s*\n?\s*(https?:\/\/[^\s\n]+)/i;
         const sourceUrlMatch = (cardData.desc || '').match(sourceUrlPattern);
         if (sourceUrlMatch && !isInternalUrl(sourceUrlMatch[1])) {
           const matchedUrl = sourceUrlMatch[1].trim();
-          // Check if it's an image URL - if so, try to find a better URL in the description
-          if (!isImageUrl(matchedUrl)) {
-            cardDescriptionUrl = matchedUrl;
-            console.log(`   ✅ Found URL in Source URL format: ${cardDescriptionUrl}`);
-          } else {
-            console.warn(`   ⚠️  Source URL format contains image URL, will try other patterns: ${matchedUrl}`);
-          }
+          // Always use the Source URL field - it's the authoritative source for attribution
+          // Even if it looks like an image URL, use it (user explicitly set it)
+          cardDescriptionUrl = matchedUrl;
+          console.log(`   ✅ Found authoritative Source URL: ${cardDescriptionUrl}`);
+          console.log(`   ℹ️  Using Source URL field exclusively - ignoring any other URLs in description`);
         }
         
         // Pattern 1b: **Source URL:** with URL on a separate line (more flexible)
+        // Only check if Pattern 1 didn't find anything
         if (!cardDescriptionUrl) {
           const sourceUrlMultilinePattern = /\*\*Source URL:\*\*\s*\n\s*(https?:\/\/[^\s\n]+)/i;
           const sourceUrlMultilineMatch = (cardData.desc || '').match(sourceUrlMultilinePattern);
           if (sourceUrlMultilineMatch && !isInternalUrl(sourceUrlMultilineMatch[1])) {
             const matchedUrl = sourceUrlMultilineMatch[1].trim();
-            // Check if it's an image URL - if so, skip and try other patterns
-            if (!isImageUrl(matchedUrl)) {
-              cardDescriptionUrl = matchedUrl;
-              console.log(`   ✅ Found URL in Source URL format (multiline): ${cardDescriptionUrl}`);
-            } else {
-              console.warn(`   ⚠️  Source URL multiline format contains image URL, will try other patterns: ${matchedUrl}`);
-            }
+            // Always use the Source URL field - it's authoritative
+            cardDescriptionUrl = matchedUrl;
+            console.log(`   ✅ Found authoritative Source URL (multiline): ${cardDescriptionUrl}`);
+            console.log(`   ℹ️  Using Source URL field exclusively - ignoring any other URLs in description`);
           }
         }
         
-        // Pattern 2: Markdown links [text](url) - prioritize Benzinga URLs, but accept any if no Benzinga found
+        // Only proceed with other patterns if Source URL field was NOT found
+        // This ensures Source URL field takes absolute priority
         if (!cardDescriptionUrl) {
+          // Pattern 2: Markdown links [text](url) - prioritize Benzinga URLs, but accept any if no Benzinga found
           const allMarkdownLinks = [...(cardData.desc || '').matchAll(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g)];
           const externalLinks = allMarkdownLinks
             .map(match => match[2])
@@ -2644,74 +2644,74 @@ app.get("/trello/generate-article/:cardId", async (req, res) => {
               cardDescriptionUrl = externalLinks[0];
             }
           }
-        }
-        
-        // Pattern 3: Plain URLs (may include trailing punctuation or markdown artifacts)
-        if (!cardDescriptionUrl) {
-          const allPlainUrls = [...(cardData.desc || '').matchAll(/(https?:\/\/[^\s\n\)<>]+)/g)];
-          const externalUrls = allPlainUrls
-            .map(match => match[1])
-            .filter(url => !isInternalUrl(url))
-            .map(url => {
-              // Clean up URL: remove trailing punctuation, markdown artifacts, and duplicate URLs
-              let cleaned = url
-                .replace(/[.,;:!?]+$/, '') // Remove trailing punctuation
-                .replace(/\]\(https?:\/\/.*$/, '') // Remove markdown link artifacts like ](https://...
-                .replace(/\)+$/, '') // Remove trailing closing parentheses
+          
+          // Pattern 3: Plain URLs (may include trailing punctuation or markdown artifacts)
+          if (!cardDescriptionUrl) {
+            const allPlainUrls = [...(cardData.desc || '').matchAll(/(https?:\/\/[^\s\n\)<>]+)/g)];
+            const externalUrls = allPlainUrls
+              .map(match => match[1])
+              .filter(url => !isInternalUrl(url))
+              .map(url => {
+                // Clean up URL: remove trailing punctuation, markdown artifacts, and duplicate URLs
+                let cleaned = url
+                  .replace(/[.,;:!?]+$/, '') // Remove trailing punctuation
+                  .replace(/\]\(https?:\/\/.*$/, '') // Remove markdown link artifacts like ](https://...
+                  .replace(/\)+$/, '') // Remove trailing closing parentheses
+                  .trim();
+                
+                // If URL contains a duplicate (like url](url), take only the first part
+                const duplicateMatch = cleaned.match(/^([^\)]+?)(\]\(https?:\/\/.*)$/);
+                if (duplicateMatch) {
+                  cleaned = duplicateMatch[1];
+                }
+                
+                return cleaned;
+              })
+              .filter(url => url.length > 0); // Remove empty URLs
+            
+            // Filter out image URLs - prioritize article URLs over image URLs
+            const articleUrls = externalUrls.filter(url => !isImageUrl(url));
+            const imageUrls = externalUrls.filter(url => isImageUrl(url));
+            
+            // Prioritize Benzinga URLs, but accept any article URL if no Benzinga found
+            const benzingaUrls = articleUrls.filter(url => url.includes('benzinga.com'));
+            if (benzingaUrls.length > 0) {
+              cardDescriptionUrl = benzingaUrls[0];
+              console.log(`   ✅ Found Benzinga URL in plain text: ${cardDescriptionUrl}`);
+            } else if (articleUrls.length > 0) {
+              // Use first article URL (not image URL)
+              cardDescriptionUrl = articleUrls[0];
+              console.log(`   ✅ Found article URL in plain text: ${cardDescriptionUrl}`);
+            } else if (externalUrls.length > 0) {
+              // Fallback: use first external URL even if it's an image (should rarely happen)
+              console.warn(`   ⚠️  Only image URLs found, using first one: ${externalUrls[0]}`);
+              cardDescriptionUrl = externalUrls[0];
+            }
+            
+            if (imageUrls.length > 0 && cardDescriptionUrl) {
+              console.log(`   ℹ️  Filtered out ${imageUrls.length} image URL(s), using article URL instead`);
+            }
+          }
+          
+          // Pattern 4: Any Benzinga URL pattern (fallback for Benzinga-specific cards)
+          if (!cardDescriptionUrl) {
+            const benzingaPattern = /(https?:\/\/[^\s\n\)<>]*benzinga\.com[^\s\n\)<>]*)/i;
+            const fallbackMatch = (cardData.desc || '').match(benzingaPattern);
+            if (fallbackMatch && !isInternalUrl(fallbackMatch[1])) {
+              let cleaned = fallbackMatch[1]
+                .replace(/[.,;:!?]+$/, '')
+                .replace(/\]\(https?:\/\/.*$/, '')
+                .replace(/\)+$/, '')
                 .trim();
               
-              // If URL contains a duplicate (like url](url), take only the first part
               const duplicateMatch = cleaned.match(/^([^\)]+?)(\]\(https?:\/\/.*)$/);
               if (duplicateMatch) {
                 cleaned = duplicateMatch[1];
               }
               
-              return cleaned;
-            })
-            .filter(url => url.length > 0); // Remove empty URLs
-          
-          // Filter out image URLs - prioritize article URLs over image URLs
-          const articleUrls = externalUrls.filter(url => !isImageUrl(url));
-          const imageUrls = externalUrls.filter(url => isImageUrl(url));
-          
-          // Prioritize Benzinga URLs, but accept any article URL if no Benzinga found
-          const benzingaUrls = articleUrls.filter(url => url.includes('benzinga.com'));
-          if (benzingaUrls.length > 0) {
-            cardDescriptionUrl = benzingaUrls[0];
-            console.log(`   ✅ Found Benzinga URL in plain text: ${cardDescriptionUrl}`);
-          } else if (articleUrls.length > 0) {
-            // Use first article URL (not image URL)
-            cardDescriptionUrl = articleUrls[0];
-            console.log(`   ✅ Found article URL in plain text: ${cardDescriptionUrl}`);
-          } else if (externalUrls.length > 0) {
-            // Fallback: use first external URL even if it's an image (should rarely happen)
-            console.warn(`   ⚠️  Only image URLs found, using first one: ${externalUrls[0]}`);
-            cardDescriptionUrl = externalUrls[0];
-          }
-          
-          if (imageUrls.length > 0 && cardDescriptionUrl) {
-            console.log(`   ℹ️  Filtered out ${imageUrls.length} image URL(s), using article URL instead`);
-          }
-        }
-        
-        // Pattern 4: Any Benzinga URL pattern (fallback for Benzinga-specific cards)
-        if (!cardDescriptionUrl) {
-          const benzingaPattern = /(https?:\/\/[^\s\n\)<>]*benzinga\.com[^\s\n\)<>]*)/i;
-          const fallbackMatch = (cardData.desc || '').match(benzingaPattern);
-          if (fallbackMatch && !isInternalUrl(fallbackMatch[1])) {
-            let cleaned = fallbackMatch[1]
-              .replace(/[.,;:!?]+$/, '')
-              .replace(/\]\(https?:\/\/.*$/, '')
-              .replace(/\)+$/, '')
-              .trim();
-            
-            const duplicateMatch = cleaned.match(/^([^\)]+?)(\]\(https?:\/\/.*)$/);
-            if (duplicateMatch) {
-              cleaned = duplicateMatch[1];
+              cardDescriptionUrl = cleaned;
+              console.log(`   ✅ Found Benzinga URL via fallback pattern: ${cardDescriptionUrl}`);
             }
-            
-            cardDescriptionUrl = cleaned;
-            console.log(`   ✅ Found Benzinga URL via fallback pattern: ${cardDescriptionUrl}`);
           }
         }
         
