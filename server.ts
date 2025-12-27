@@ -1896,7 +1896,7 @@ app.get("/trello/process-card/:cardId", async (req, res) => {
             
             // Update card with "Generate Article" button and store scraped data
             const baseUrl = process.env.APP_URL || 'http://localhost:3001';
-            const generateArticleUrl = `${baseUrl}/trello/generate-article/${cardId}?selectedApp=story`;
+            const generateArticleUrl = `${baseUrl}/trello/generate-article/${cardId}?selectedApp=news-story`;
             
             let updatedDesc = card.desc || '';
             

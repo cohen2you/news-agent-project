@@ -1211,6 +1211,19 @@ function loadAppConfig(appName: string): ArticleGenConfig {
       console.log(`   ⚠️  ${urlEnvKey} not found! Converting base URL to pr-story endpoint: ${appUrl}`);
     }
   
+    // Special handling for "news-story" app - for news ingestion lists (Markets, Economy, Commodities, Hedge Funds, Tech)
+    // Uses ARTICLE_GEN_APP_NEWS_STORY_URL environment variable
+    if (appName.toLowerCase() === 'news-story' && !appUrl) {
+      // Check for the NEWS_STORY_URL environment variable
+      const newsStoryUrl = process.env.ARTICLE_GEN_APP_NEWS_STORY_URL;
+      if (newsStoryUrl) {
+        appUrl = newsStoryUrl;
+        console.log(`   ✅ Using ARTICLE_GEN_APP_NEWS_STORY_URL: ${appUrl}`);
+      } else {
+        console.warn(`   ⚠️  ARTICLE_GEN_APP_NEWS_STORY_URL not found for news-story app!`);
+      }
+    }
+  
   if (!appUrl) {
     console.warn(`   ⚠️  ${urlEnvKey} not found! Falling back to base config URL: ${baseConfig.apiUrl || 'not set'}`);
   }

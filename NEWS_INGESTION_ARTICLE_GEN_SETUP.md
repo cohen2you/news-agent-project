@@ -1,21 +1,21 @@
 # News Ingestion Article Generation Setup
 
-The news ingestion service (Markets, Economy, Commodities, Hedge Funds lists) now supports article generation using the `/api/generate/story` endpoint from the news-story-generator app.
+The news ingestion service (Markets, Economy, Commodities, Hedge Funds, Tech & AI lists) now supports article generation using the `/api/generate/story` endpoint from the news-story-generator app.
 
 ## Environment Configuration
 
 Add these environment variables to your `.env` file:
 
 ```env
-# Story Generator (for news ingestion articles - Markets, Economy, Commodities, Hedge Funds)
-ARTICLE_GEN_APP_STORY_TYPE=http
-ARTICLE_GEN_APP_STORY_URL=http://localhost:3000/api/generate/story
+# News Story Generator (for news ingestion articles - Markets, Economy, Commodities, Hedge Funds, Tech & AI)
+ARTICLE_GEN_APP_NEWS_STORY_TYPE=http
+ARTICLE_GEN_APP_NEWS_STORY_URL=http://localhost:3000/api/generate/story
 ```
 
 **Important Notes:**
 - Make sure the port matches where your news-story-generator app is running (usually port 3000)
 - The endpoint is `/api/generate/story` - this is the story generation endpoint used for news ingestion articles
-- This is the same endpoint pattern used for PR-related articles, but you can use a different endpoint if desired
+- Uses `ARTICLE_GEN_APP_NEWS_STORY_URL` environment variable (separate from PR-related articles which use `ARTICLE_GEN_APP_STORY_URL`)
 
 ## How It Works
 
@@ -33,7 +33,7 @@ Cards created by the news ingestion service include:
 - **Title**: The article headline
 - **Source URL**: The full URL to the original article (prominently displayed at the top)
 - **Content**: A snippet of the article content (first 1000 characters)
-- **Generate Article Button**: Links to the article generation endpoint with `selectedApp=story`
+- **Generate Article Button**: Links to the article generation endpoint with `selectedApp=news-story`
 
 ## Testing
 
