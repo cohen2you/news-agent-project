@@ -1750,7 +1750,15 @@ app.get("/trello/process-card/:cardId", async (req, res) => {
       }
     }
     
-    // Pattern 3: Source URL in specific format
+    // Pattern 3: Source URL in specific format (for news ingestion cards)
+    if (!articleUrl) {
+      const sourceUrlMatch = card.desc.match(/\*\*Source URL:\*\*\s*(https?:\/\/[^\s\n]+)/i);
+      if (sourceUrlMatch && !isInternalUrl(sourceUrlMatch[1])) {
+        articleUrl = sourceUrlMatch[1].trim();
+      }
+    }
+    
+    // Pattern 4: Source URL with View Original format (for PR/WGO cards)
     if (!articleUrl) {
       const sourceMatch = card.desc.match(/\*\*Source:\*\*\s*\[View Original\]\((https?:\/\/[^\)]+)\)/);
       if (sourceMatch && !isInternalUrl(sourceMatch[1])) {
