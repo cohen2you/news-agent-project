@@ -1640,13 +1640,22 @@ app.get("/trello/process-card/:cardId", async (req, res) => {
     console.log(`   📋 Card: "${card.name}"`);
     console.log(`   📋 List ID: ${listId}`);
     
-    // Determine if this is PR or WGO list based on list ID
+    // Determine card type based on list ID
     const prListId = process.env.TRELLO_LIST_ID_PR;
     const wgoListId = process.env.TRELLO_LIST_ID_WGO;
+    const marketsListId = process.env.TRELLO_LIST_ID_MARKETS;
+    const economyListId = process.env.TRELLO_LIST_ID_ECONOMY;
+    const commoditiesListId = process.env.TRELLO_LIST_ID_COMMODITIES;
+    const hedgeFundsListId = process.env.TRELLO_LIST_ID_HEDGE_FUNDS;
+    
     const isPRList = prListId && listId === prListId;
     const isWGOList = wgoListId && listId === wgoListId;
+    const isNewsIngestionList = (marketsListId && listId === marketsListId) ||
+                                 (economyListId && listId === economyListId) ||
+                                 (commoditiesListId && listId === commoditiesListId) ||
+                                 (hedgeFundsListId && listId === hedgeFundsListId);
     
-    if (!isPRList && !isWGOList) {
+    if (!isPRList && !isWGOList && !isNewsIngestionList) {
       const errorHtml = `
 <!DOCTYPE html>
 <html>
@@ -1673,7 +1682,7 @@ app.get("/trello/process-card/:cardId", async (req, res) => {
 <body>
     <div class="message">
         <h2>❌ Error</h2>
-        <p>This card is not in a PR-Related Stories or WGO/WIIM Stories list.</p>
+        <p>This card is not in a supported list (PR-Related Stories, WGO/WIIM Stories, Markets, Economy, Commodities, or Hedge Funds).</p>
         <p>Please move the card to one of these lists before processing.</p>
         <button onclick="window.close()" style="margin-top: 20px; padding: 10px 20px; cursor: pointer;">Close</button>
     </div>
@@ -1682,7 +1691,7 @@ app.get("/trello/process-card/:cardId", async (req, res) => {
       return res.status(400).send(errorHtml);
     }
     
-    const articleType = isPRList ? 'PR' : 'WGO';
+    const articleType = isPRList ? 'PR' : (isWGOList ? 'WGO' : 'News Ingestion');
     console.log(`   📝 Detected as ${articleType} article type`);
     
     // Extract URL from card description
