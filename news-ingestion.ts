@@ -22,10 +22,10 @@ const FEEDS = [
   { name: "Yahoo Finance Top", url: 'https://finance.yahoo.com/news/rssindex' },
   { name: "Fortune Finance", url: 'https://fortune.com/feed/finance' },
 
-  // 2. ECONOMY & MACRO (Replaced MarketWatch with free, reliable sources)
+  // 2. ECONOMY & MACRO (Replaced Zombie CNN with NYT & Yahoo Economy)
   { name: "CNBC Economy", url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258' },
-  { name: "Investing.com Economy", url: 'https://www.investing.com/rss/news_14.rss' },
-  { name: "CNN Business Economy", url: 'http://rss.cnn.com/rss/money_news_economy.rss' },
+  { name: "NY Times Economy", url: 'https://rss.nytimes.com/services/xml/rss/nyt/Economy.xml' },
+  { name: "Yahoo Finance Economy", url: 'https://finance.yahoo.com/news/rss/economy' },
 
   // 3. COMMODITIES (Replaced Kitco with reliable alternatives)
   { name: "Investing.com Commodities", url: 'https://www.investing.com/rss/commodities.rss' },
